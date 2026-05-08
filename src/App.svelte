@@ -103,6 +103,19 @@
     default: "#5d69fb",
   };
 
+  const DOMEIN_ICONS = {
+    Wonen: "ph-house-simple",
+    Welzijn: "ph-heartbeat",
+    Cultuur: "ph-palette",
+    Klimaat: "ph-cloud-rain",
+    Voedsel: "ph-carrot",
+    Groen: "ph-tree-evergreen",
+    Circulair: "ph-arrows-clockwise",
+    Mobiliteit: "ph-car-simple",
+    Energie: "ph-lightbulb",
+    default: "ph-map-pin",
+  };
+
   const GEBIED_COLORS = {
     "Bospolder-Tussendijken": "#F3B1A5",
     "Keilekwartier/M4H": "#A2C3DB",
@@ -335,12 +348,25 @@
       if (isArea) {
         // --- AREA MARKER: Alleen het eerste icoon in het groot, zonder witte achtergrond ---
         const firstDomein = domeinList[0];
-        el.innerHTML = `<img src="${firstDomein.toLowerCase()}.png" alt="${firstDomein}" style="width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));" onerror="this.src='default.png'">`;
+        const iconColor = DOMEIN_COLORS[firstDomein] || DOMEIN_COLORS.default;
+        if (firstDomein === "Energie") {
+          el.innerHTML = `<img src="lampje.png" alt="Energie" style="width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));">`;
+        } else {
+          const iconClass = DOMEIN_ICONS[firstDomein] || DOMEIN_ICONS.default;
+          // Een mooi vurig / opvallend drop-shadow zodat ie goed afsteekt op de gekleurde map
+          el.innerHTML = `<i class="ph ${iconClass}" style="color: ${iconColor}; font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></i>`;
+        }
       } else {
         // --- POINT MARKER: Originele logica (witte pilvorm met evt. meerdere icoontjes) ---
         let iconsHtml = "";
         domeinList.forEach((d) => {
-          iconsHtml += `<img src="${d.toLowerCase()}.png" alt="${d}" style="width: 20px; height: 20px; margin: 2px 0px 0px;" onerror="this.src='default.png'">`;
+          const iconColor = DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
+          if (d === "Energie") {
+            iconsHtml += `<img src="lampje.png" alt="Energie" style="width: 16px; height: 16px; margin: 0 2px;">`;
+          } else {
+            const iconClass = DOMEIN_ICONS[d] || DOMEIN_ICONS.default;
+            iconsHtml += `<i class="ph ${iconClass}" style="color: ${iconColor};"></i>`;
+          }
         });
         el.innerHTML = iconsHtml;
 
@@ -457,15 +483,11 @@
                   (selectedDomeinen = toggleFilter(selectedDomeinen, domein))}
               />
               <span class="filter-text">{domein}</span>
-              <img
-                src="{domein.toLowerCase()}.png"
-                alt={domein}
-                class="sidebar-icon"
-                style="width: 20px; height: 20px;"
-                onerror={(e) => {
-                  e.target.src = "default.png";
-                }}
-              />
+              <i
+                class="ph {DOMEIN_ICONS[domein] ||
+                  DOMEIN_ICONS.default} sidebar-icon"
+                style="color: {DOMEIN_COLORS[domein] || DOMEIN_COLORS.default}"
+              ></i>
             </label>
           {/each}
         </div>
@@ -1027,8 +1049,8 @@
 
   /* POINT MARKERS (Oude stijl met border) */
   :global(.air-marker) {
-    min-width: 30px;
-    height: 30px;
+    min-width: 26px;
+    height: 26px;
     border: 2px solid #737ac6;
     border-radius: 13px;
     cursor: pointer;
@@ -1040,14 +1062,6 @@
     gap: 2px;
     padding: 0 4px;
     box-sizing: border-box;
-  }
-  /* When there's only one icon, make it a perfect circle with vertical space */
-  :global(.air-marker:has(img:only-child)) {
-    width: 30px;
-    height: 30px;
-    min-width: 30px;
-    border-radius: 15px;
-    padding: 3px;
   }
   :global(.air-marker i) {
     font-size: 14px;
@@ -1064,10 +1078,6 @@
       0 0 0 3px #5d69fb33,
       0 0 15px 8px rgba(132, 80, 255, 0.15),
       0 2px 6px rgba(0, 0, 0, 0.2);
-  }
-  /* Adjust active glow for single-icon circular markers */
-  :global(.air-marker.active-glow:has(img:only-child)) {
-    border: 3px solid #5d69fb;
   }
 
   /* AREA MARKERS (Nieuw: Alleen groot icon in het midden van het gebied) */
