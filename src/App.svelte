@@ -20,6 +20,7 @@
   let selectedPlace = $state(null);
   let activeMarkerElement = $state(null);
   let enlargedImage = $state(null);
+  let isMobile = $state(window.innerWidth < 900);
 
   // --- MAP OPZETTEN ---
   function initMap(geoData) {
@@ -221,7 +222,6 @@
   function activatePlaceOnMap(place) {
     if (activeMarkerElement) {
       activeMarkerElement.classList.remove("active-glow");
-      // Reset z-index when removing active state
       activeMarkerElement.style.zIndex = "";
     }
 
@@ -230,30 +230,44 @@
     if (markerEntry) {
       activeMarkerElement = markerEntry.element;
       markerEntry.element.classList.add("active-glow");
-      // Move active marker to front with highest z-index
       markerEntry.element.style.zIndex = "9999";
     } else {
       activeMarkerElement = null;
     }
 
-    let isMobile = window.innerWidth < 900;
-    let sidebarOpen = !isMobile;
-
-    window.addEventListener("resize", () => {
-      isMobile = window.innerWidth < 900;
-      sidebarOpen = !isMobile;
-    });
     const sidebarWidth = 280;
     const popupWidth = 200;
+
+    // Alleen op desktop gebruiken we offset voor de linker zijbalk
     const offsetX = isMobile ? 0 : sidebarWidth - popupWidth * 2;
-    const offsetY = isMobile ? -5 : 0;
+
+    // Belangrijk: op mobiel zetten we de offset op 0, want padding doet het werk!
+    const offsetY = 0;
+
+    // Dynamische padding voor mobiel:
+    // Is het menu open? Bedek dan de onderste helft (50vh + 40px marge).
+    // Is het dicht? Bedek dan alleen de menuknop (~70px).
+    const mobileBottomPadding = mobileSidebarOpen
+      ? window.innerHeight * 0.5 + 40
+      : 70;
+
+    // Reserveer ruim voldoende plek aan de bovenkant voor de popup
+    const mobileTopPadding = 240;
+
     const padding = isMobile
-      ? { top: 100, bottom: 150, left: 20, right: 20 }
+      ? {
+          top: mobileTopPadding,
+          bottom: mobileBottomPadding,
+          left: 20,
+          right: 20,
+        }
       : { top: 60, bottom: 60, left: 60, right: 60 };
 
     if (place.location_type === "area") {
-      const areaGebieden = (place.gebied || "").split(";").map((g) => g.trim());
-      const isLargeArea = areaGebieden.length > 15;
+      const areaGebiedenParsed = (place.gebied || "")
+        .split(";")
+        .map((g) => g.trim());
+      const isLargeArea = areaGebiedenParsed.length > 15;
 
       if (isLargeArea) {
         map.flyTo({
@@ -266,11 +280,8 @@
       } else {
         const areaBounds = getAreaBounds(place.gebied);
         if (areaBounds && !areaBounds.isEmpty()) {
-          const areaPadding = isMobile
-            ? { top: 100, bottom: 100, left: 20, right: 20 }
-            : { top: 160, bottom: 60, left: 100, right: 250 };
           map.fitBounds(areaBounds, {
-            padding: areaPadding,
+            padding,
             speed: 0.8,
             curve: 1.2,
             essential: true,
@@ -286,7 +297,7 @@
         }
       }
 
-      clickedAreaGebieden = areaGebieden.filter(Boolean);
+      clickedAreaGebieden = areaGebiedenParsed.filter(Boolean);
     } else {
       map.flyTo({
         center: [place.longitude, place.latitude],
@@ -299,25 +310,6 @@
       clickedAreaGebieden = [];
     }
   }
-
-  let uniqueGebieden = $derived.by(() => {
-    const gebieden = new Set();
-    allPlaces.forEach((p) => {
-      if (!p.gebied) return;
-      const parts = String(p.gebied)
-        .split(";")
-        .map((g) => g.trim())
-        .filter(Boolean);
-      if (parts.length === 1) {
-        // Single gebied -> add it
-        gebieden.add(parts[0]);
-      } else if (parts.length > 15) {
-        // More than 15 buurten -> add Rotterdam
-        gebieden.add("Rotterdam");
-      }
-    });
-    return [...gebieden].sort();
-  });
   // zorg dat alleen unieke koepels en enkele koepels in de filter getoond worden
   let uniqueKoepels = $derived(
     [
@@ -475,6 +467,11 @@
 
   // --- DATA INLADEN ---
   onMount(async () => {
+    const handleResize = () => {
+      isMobile = window.innerWidth < 900;
+    };
+    window.addEventListener("resize", handleResize);
+
     const response = await fetch("initiatieven.csv");
     const csvString = await response.text();
     const geoResponse = await fetch("rotterdam-buurten.json");
@@ -755,6 +752,33 @@
 
     return found ? bounds : null;
   }
+
+  // --- Zet dit ergens los op root-niveau in je script ---
+  $effect(() => {
+    if (isMobile && selectedPlace && map) {
+      // Re-trigger map positioning whenever mobile sidebar is opened or closed
+      mobileSidebarOpen;
+      activatePlaceOnMap(selectedPlace);
+    }
+  });
+
+  // --- Schone versie van uniqueGebieden ---
+  let uniqueGebieden = $derived.by(() => {
+    const gebieden = new Set();
+    allPlaces.forEach((p) => {
+      if (!p.gebied) return;
+      const parts = String(p.gebied)
+        .split(";")
+        .map((g) => g.trim())
+        .filter(Boolean);
+      if (parts.length === 1) {
+        gebieden.add(parts[0]);
+      } else if (parts.length > 15) {
+        gebieden.add("Rotterdam");
+      }
+    });
+    return [...gebieden].sort();
+  });
 </script>
 
 <div class="layout" onclick={closePopup} role="presentation">
@@ -762,6 +786,10 @@
     class="sidebar"
     class:open={mobileSidebarOpen}
     onclick={(e) => e.stopPropagation()}
+    ontouchstart={(e) => e.stopPropagation()}
+    ontouchmove={(e) => e.stopPropagation()}
+    ontouchend={(e) => e.stopPropagation()}
+    onwheel={(e) => e.stopPropagation()}
     role="presentation"
   >
     <button
@@ -1030,6 +1058,10 @@
       <div
         class="fixed-air-popup"
         onclick={(e) => e.stopPropagation()}
+        ontouchstart={(e) => e.stopPropagation()}
+        ontouchmove={(e) => e.stopPropagation()}
+        ontouchend={(e) => e.stopPropagation()}
+        onwheel={(e) => e.stopPropagation()}
         role="presentation"
       >
         <div class="popup-top-bar">
