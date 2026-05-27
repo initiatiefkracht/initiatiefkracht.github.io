@@ -920,11 +920,11 @@
             </section>
             <button
               class="image-button"
-              onclick={() => (enlargedImage = "waardebloem.png")}
+              onclick={() => (enlargedImage = "Waardebloem.png")}
               title="klik om te vergroten"
             >
               <img
-                src="waardebloem.png"
+                src="Waardebloem.png"
                 alt="Waardebloem"
                 style="width: 100%; margin-top: 10px;"
               />
