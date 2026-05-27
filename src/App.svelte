@@ -1434,7 +1434,7 @@
     }
 
     :global(.maplibregl-ctrl-bottom-right) {
-      bottom: 70px !important; /* Netjes boven de toggle-knop */
+      bottom: 90px !important; /* Netjes boven de toggle-knop */
     }
 
     .filter-item {
