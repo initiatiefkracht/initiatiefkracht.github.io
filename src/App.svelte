@@ -777,6 +777,9 @@
     ontouchstart={(e) => e.stopPropagation()}
     ontouchmove={(e) => e.stopPropagation()}
     ontouchend={(e) => e.stopPropagation()}
+    onpointerdown={(e) => e.stopPropagation()}
+    onpointermove={(e) => e.stopPropagation()}
+    onpointerup={(e) => e.stopPropagation()}
     onwheel={(e) => e.stopPropagation()}
     role="presentation"
   >
@@ -1038,13 +1041,6 @@
         </button>
         {#if openSections.location}
           <div class="accordion-content">
-            <p>
-              In de kaart worden zowel initiatieven met een fysieke locatie
-              (zoals een buurthuis of park) als initiatieven die zich over een
-              gebied uitstrekken (zoals een netwerk of wijkcoöperatie) getoond.
-              Deze initiatieven hebben niet altijd een fysieke locatie, maar
-              zijn actief in een gebied.
-            </p>
             <div class="accordion-divider"></div>
             <label class="filter-item">
               <input
@@ -1437,9 +1433,8 @@
       font-size: 10px !important;
     }
 
-    /* Move map controls up on mobile to avoid sidebar handle */
     :global(.maplibregl-ctrl-bottom-right) {
-      bottom: 50px !important;
+      bottom: 60px !important; /* Netjes boven de toggle-knop */
     }
 
     .filter-item {
