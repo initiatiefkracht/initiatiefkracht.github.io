@@ -78,6 +78,8 @@
   }
 
   // --- CONFIGURATIES ---
+  const POINT_ZOOM = 15.5;
+  const AREA_ZOOM = 13;
   const LARGE_AREA_ZOOM = 11;
 
   const DOMEIN_COLORS = {
@@ -236,77 +238,53 @@
     }
 
     const sidebarWidth = 280;
-    const popupWidth = 200;
+    const desktopPopupWidth = 320; // CSS width is 300px, + margin
 
-    // Alleen op desktop gebruiken we offset voor de linker zijbalk
-    const offsetX = isMobile ? 0 : sidebarWidth - popupWidth * 2;
-
-    // Belangrijk: op mobiel zetten we de offset op 0, want padding doet het werk!
-    const offsetY = 0;
-
-    // Dynamische padding voor mobiel:
-    // Is het menu open? Bedek dan de onderste helft (50vh + 40px marge).
-    // Is het dicht? Bedek dan alleen de menuknop (~70px).
-    const mobileBottomPadding = mobileSidebarOpen
-      ? window.innerHeight * 0.5 + 40
-      : 70;
-
-    // Reserveer ruim voldoende plek aan de bovenkant voor de popup
-    const mobileTopPadding = 240;
-
+    // Dynamische padding die de UI-elementen ontwijkt:
+    // Op desktop: links de sidebar (280px), rechts de popup (320px).
+    // Op mobiel: onderin het menu, bovenin de popup.
     const padding = isMobile
       ? {
-          top: mobileTopPadding,
-          bottom: mobileBottomPadding,
+          top: 240, // Ruimte voor popup
+          bottom: mobileSidebarOpen ? window.innerHeight * 0.5 + 40 : 70,
           left: 20,
           right: 20,
         }
-      : { top: 60, bottom: 60, left: 60, right: 60 };
+      : {
+          top: 60,
+          bottom: 60,
+          left: sidebarWidth + 60,
+          right: desktopPopupWidth + 60,
+        };
+
+    // We gebruiken nu padding om te centreren in de vrije ruimte tussen sidebar en popup.
+    // De zoom-logica is nu voor beide gelijk: we vliegen naar de marker-locatie.
+    let targetZoom = POINT_ZOOM;
 
     if (place.location_type === "area") {
       const areaGebiedenParsed = (place.gebied || "")
         .split(";")
-        .map((g) => g.trim());
-      const isLargeArea = areaGebiedenParsed.length > 15;
+        .map((g) => g.trim())
+        .filter(Boolean);
+      const isLargeArea = areaGebiedenParsed.length > 10;
+      targetZoom = isLargeArea ? LARGE_AREA_ZOOM : AREA_ZOOM;
+    }
 
-      if (isLargeArea) {
-        map.flyTo({
-          center: [place.longitude, place.latitude],
-          zoom: LARGE_AREA_ZOOM,
-          padding,
-          speed: 0.8,
-          essential: true,
-        });
-      } else {
-        const areaBounds = getAreaBounds(place.gebied);
-        if (areaBounds && !areaBounds.isEmpty()) {
-          map.fitBounds(areaBounds, {
-            padding,
-            speed: 0.8,
-            curve: 1.2,
-            essential: true,
-          });
-        } else {
-          map.flyTo({
-            center: [place.longitude, place.latitude],
-            zoom: 14,
-            padding,
-            speed: 0.8,
-            essential: true,
-          });
-        }
-      }
+    map.flyTo({
+      center: [place.longitude, place.latitude],
+      zoom: targetZoom,
+      padding,
+      speed: 0.8,
+      curve: 1.2,
+      essential: true,
+    });
 
-      clickedAreaGebieden = areaGebiedenParsed.filter(Boolean);
+    if (place.location_type === "area") {
+      clickedAreaGebieden = (place.gebied || "")
+        .split(";")
+        .map((g) => g.trim())
+        .filter(Boolean);
     } else {
-      map.flyTo({
-        center: [place.longitude, place.latitude],
-        offset: [offsetX, offsetY],
-        zoom: 15.5,
-        padding,
-        speed: 0.8,
-        essential: true,
-      });
       clickedAreaGebieden = [];
     }
   }
