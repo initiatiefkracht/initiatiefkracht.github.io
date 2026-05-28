@@ -21,6 +21,66 @@
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
   let enlargedImage = $state(null);
+  let modalScale = $state(1);
+  let modalPosition = $state({ x: 0, y: 0 });
+  let isModalDragging = false;
+  let dragStart = { x: 0, y: 0 };
+
+  function handleModalWheel(e) {
+    if (!enlargedImage) return;
+    e.preventDefault();
+    const delta = -e.deltaY;
+    const factor = delta > 0 ? 1.1 : 0.9;
+    const newScale = Math.min(Math.max(modalScale * factor, 0.5), 10);
+    modalScale = newScale;
+  }
+
+  function handleModalMouseDown(e) {
+    if (modalScale <= 1) return;
+    isModalDragging = true;
+    dragStart = {
+      x: e.clientX - modalPosition.x,
+      y: e.clientY - modalPosition.y,
+    };
+  }
+
+  function handleModalMouseMove(e) {
+    if (!isModalDragging) return;
+    modalPosition = {
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    };
+  }
+
+  function handleModalTouchStart(e) {
+    if (modalScale <= 1 || e.touches.length !== 1) return;
+    isModalDragging = true;
+    const touch = e.touches[0];
+    dragStart = {
+      x: touch.clientX - modalPosition.x,
+      y: touch.clientY - modalPosition.y,
+    };
+  }
+
+  function handleModalTouchMove(e) {
+    if (!isModalDragging || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    modalPosition = {
+      x: touch.clientX - dragStart.x,
+      y: touch.clientY - dragStart.y,
+    };
+  }
+
+  function handleModalMouseUp() {
+    isModalDragging = false;
+  }
+
+  function closeImageModal() {
+    enlargedImage = null;
+    modalScale = 1;
+    modalPosition = { x: 0, y: 0 };
+  }
+
   let isMobile = $state(false);
 
   // --- MAP OPZETTEN ---
@@ -262,7 +322,7 @@
       activeMarkerContainer = null;
     }
 
-    const sidebarWidth = 280;
+    const sidebarWidth = 350;
     const desktopPopupWidth = 320; // CSS width is 300px, + margin
 
     // Dynamische padding die de UI-elementen ontwijkt:
@@ -847,11 +907,31 @@
         {#if openSections.info}
           <div class="accordion-content">
             <section class="initiatives-intro">
-              <p class="lead">
-                Op deze kaart zie je een overzicht van lokale initiatieven die
-                zich inzetten voor de stad. We brengen deze initiatiefkracht in
-                kaart aan de hand van de volgende categorieën:
-              </p>
+              <div class="intro-section">
+                <strong>Waarom deze kaart?</strong>
+                <p>
+                  Overal in Rotterdam ontstaan er nieuwe initiatieven waarin
+                  mensen en gemeenschappen, vaak onder de radar, experimenteren
+                  met alternatieven voor de toekomst. Op het gebied van
+                  circulariteit, energie, mobiliteit, natuur, voedsel, werken en
+                  wonen ontstaan praktijken die niet wachten op beleid, maar
+                  handelen vanuit maatschappelijke noodzaak en
+                  verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden
+                  door een gedeelde zoektocht.
+                </p>
+              </div>
+
+              <div class="intro-section">
+                <strong>Over deze kaart</strong>
+                <p>
+                  In deze kaart vind je een selectie van initiatieven in
+                  Rotterdam, die verdeeld zijn in categorieën en domeinen. De
+                  kaart is niet volledig, maar geeft een eerste indruk van de
+                  diversiteit aan initiatieven die er zijn. Hier onder vind je
+                  een uitleg van de categorieën en domeinen die we gebruiken om
+                  de initiatieven te ordenen.
+                </p>
+              </div>
 
               <div class="category-list">
                 <div class="category-item">
@@ -892,45 +972,48 @@
                     <strong>Koepels</strong>
                     <p>
                       Overkoepelende organisaties die meerdere initiatieven
-                      onder zich hebben en verbinden. Bij een initiatief staat
-                      aangegeven of het onderdeel is van een koepel. Niet alle
-                      initiatieven zijn onderdeel van een koepel.
+                      onder zich hebben en verbinden.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="category-item">
+                  <span
+                    class="domein-icon ph ph-house"
+                    style="color: {DOMEIN_COLORS['Wonen']}"
+                    aria-hidden="true"
+                  ></span>
+                  <div class="category-text">
+                    <strong>Domeinen</strong>
+                    <p>
+                      De initiatieven zijn onderverdeeld in domeinen. Sommige
+                      initiatieven vallen onder meerdere domeinen.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div class="category-item">
-                <span
-                  class="domein-icon ph ph-house"
-                  style="color: {DOMEIN_COLORS['Wonen']}"
-                  aria-hidden="true"
-                ></span>
-                <div class="category-text">
-                  <strong>Domeinen</strong>
-                  <p>
-                    De initiatieven zijn onderverdeeld in domeinen. Sommige
-                    initiatieven vallen onder meerdere domeinen.
-                  </p>
-                </div>
+              <div class="waardebloem-section">
+                <p class="cta">
+                  <strong>Klik op de Waardenbloem</strong>
+                  en bekijk hoe de domeinen en categorieën zich tot elkaar verhouden.
+                </p>
+                <button
+                  class="waardebloem-icon-btn"
+                  onclick={() => (enlargedImage = "Waardebloem.png")}
+                  title="Klik om de Waardebloem te vergroten"
+                >
+                  <img src="Waardebloem.png" alt="Waardebloem" />
+                </button>
               </div>
-
-              <p class="cta">
-                <strong>Klik op de waardenbloem</strong> en zie hoe de domeinen en
-                categorieën van initiatieven zich tot elkaar verhouden.
-              </p>
+              <div class="accordion-divider"></div>
+              <div class="intro-section">
+                <p>
+                  Deze kaart is ontwikkeld door AIR, voor de Stadmakersacademie.
+                  In samenwerking met Groen010 is de data vergaard.
+                </p>
+              </div>
             </section>
-            <button
-              class="image-button"
-              onclick={() => (enlargedImage = "Waardebloem.png")}
-              title="klik om te vergroten"
-            >
-              <img
-                src="Waardebloem.png"
-                alt="Waardebloem"
-                style="width: 100%; margin-top: 10px;"
-              />
-            </button>
           </div>
         {/if}
       </div>
@@ -1105,12 +1188,16 @@
         {#if openSections.contribute}
           <div class="accordion-content">
             <p>
-              Heb je opmerkingen over de vermelding van jouw initiatief? Of wil
-              je je eigen initiatief op de kaart hebben? Stuur een mail naar <a
-                href="mailto:office@airrotterdam.eu"
-                style="color: #5d69fb; text-decoration: none; font-weight: 500;"
-                >office@airrotterdam.eu</a
-              >
+              Heb je opmerkingen over de vermelding van jouw initiatief? Stuur
+              dan een email naar <a href="mailto:initiatiefkracht@gmail.com"
+                >initiatiefkracht@gmail.com</a
+              >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
+              initiatief
+              <a
+                href="https://forms.gle/2L41WPykgQH5QRAY7"
+                target="_blank"
+                rel="noopener noreferrer">hier</a
+              > aan!
             </p>
           </div>
         {/if}
@@ -1132,10 +1219,32 @@
   {#if enlargedImage}
     <div
       class="image-modal"
-      onclick={() => (enlargedImage = null)}
+      onwheel={handleModalWheel}
+      onmousedown={handleModalMouseDown}
+      onmousemove={handleModalMouseMove}
+      onmouseup={handleModalMouseUp}
+      onmouseleave={handleModalMouseUp}
+      ontouchstart={handleModalTouchStart}
+      ontouchmove={handleModalTouchMove}
+      ontouchend={handleModalMouseUp}
       role="presentation"
     >
-      <img src={enlargedImage} alt="Enlarged" class="enlarged-image" />
+      <button
+        class="modal-close-btn"
+        onclick={closeImageModal}
+        aria-label="Sluiten"
+      >
+        <i class="ph ph-x"></i>
+      </button>
+      <div
+        class="modal-content"
+        style="transform: translate({modalPosition.x}px, {modalPosition.y}px) scale({modalScale}); cursor: {modalScale >
+        1
+          ? 'grab'
+          : 'default'}"
+      >
+        <img src={enlargedImage} alt="Enlarged" class="enlarged-image" />
+      </div>
     </div>
   {/if}
 
@@ -1239,7 +1348,7 @@
     left: 0;
   }
   .sidebar {
-    width: 280px;
+    width: 350px;
     height: 100%;
     background: #fbf9f9;
     border-right: 1px solid rgba(0, 0, 0, 0.05);
@@ -1572,6 +1681,7 @@
     letter-spacing: 0.05rem;
     color: #5d69fb;
     text-align: left;
+    outline: none;
   }
   .accordion-header:hover {
     background: rgba(132, 80, 255, 0.05);
@@ -1971,17 +2081,43 @@
     border: 1px solid rgba(0, 0, 0, 0.1);
   }
 
-  .image-button {
-    background: none;
-    border: none;
-    padding: 0;
+  .waardebloem-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .waardebloem-icon-btn {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    padding: 4px;
+    background: white;
+    border: 1px solid #d8d2c8;
+    border-radius: 12px;
     cursor: pointer;
-    display: block;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .waardebloem-icon-btn:hover {
+    border-color: #5d69fb;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(93, 105, 251, 0.1);
+  }
+
+  .waardebloem-icon-btn img {
     width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
-  .image-button:hover img {
-    opacity: 0.9;
-  }
+
   .reset-button {
     width: calc(100% - 40px);
     margin: 12px 20px;
@@ -2020,17 +2156,52 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.9);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 3000;
-    cursor: pointer;
+    overflow: hidden;
+    user-select: none;
+  }
+  .modal-content {
+    transition: transform 0.05s ease-out;
+    will-change: transform;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .enlarged-image {
     max-width: 90vw;
     max-height: 90vh;
     object-fit: contain;
+    pointer-events: none;
+  }
+  .modal-close-btn {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: white;
+    border: 1px solid #5d69fb;
+    color: #5d69fb;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  .modal-close-btn:hover {
+    background: #5d69fb;
+    color: white;
+    transform: rotate(90deg) scale(1.1);
+  }
+  .modal-close-btn i {
+    font-size: 1.5rem;
   }
 
   .initiatives-intro {
@@ -2045,6 +2216,17 @@
     color: #333;
     line-height: 1.4;
     margin: 0;
+  }
+
+  .intro-section {
+    margin-bottom: 8px;
+  }
+
+  .intro-section strong {
+    display: block;
+    font-size: 0.85rem;
+    color: #333;
+    margin-bottom: 4px;
   }
 
   .category-list {
