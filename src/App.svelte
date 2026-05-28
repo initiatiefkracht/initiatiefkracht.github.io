@@ -924,12 +924,20 @@
               <div class="intro-section">
                 <strong>Over deze kaart</strong>
                 <p>
-                  In deze kaart vind je een selectie van initiatieven in
-                  Rotterdam, die verdeeld zijn in categorieën en domeinen. De
-                  kaart is niet volledig, maar geeft een eerste indruk van de
-                  diversiteit aan initiatieven die er zijn. Hier onder vind je
-                  een uitleg van de categorieën en domeinen die we gebruiken om
-                  de initiatieven te ordenen.
+                  Op deze kaart vind je een verzameling van initiatieven in
+                  Rotterdam, verdeeld over verschillende categorieën en
+                  domeinen. De kaart is niet volledig, maar geeft een eerste
+                  indruk van de diversiteit aan initiatieven in de stad. Veel
+                  initiatieven laten zich niet eenvoudig in één domein plaatsen.
+                  Ze ontstaan vaak vanuit een behoefte of urgentie in een wijk
+                  of gemeenschap, en werken daardoor juist integraal en
+                  domeinoverstijgend. Toch hebben we gekozen voor een
+                  categorisering om de veelzijdigheid van initiatiefkracht beter
+                  leesbaar en navigeerbaar te maken. Zo hopen we dat
+                  initiatieven, organisaties en bewoners elkaar makkelijker
+                  kunnen vinden, versterken en ondersteunen. <br /> <br />Hier
+                  onder vind je een uitleg van de categorieën en domeinen die we
+                  gebruiken om de initiatieven te ordenen.
                 </p>
               </div>
 
