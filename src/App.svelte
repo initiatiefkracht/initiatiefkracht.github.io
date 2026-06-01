@@ -993,6 +993,14 @@
                   Deze kaart is ontwikkeld door AIR, voor de Stadmakersacademie.
                   In samenwerking met Groen010 is de data vergaard.
                 </p>
+                <div class="logos-section">
+                  <img src="AIR.png" alt="AIR logo" class="org-logo" />
+                  <img
+                    src="VG010_logo.png"
+                    alt="Groen010 logo"
+                    class="org-logo"
+                  />
+                </div>
               </div>
             </section>
           </div>
@@ -1957,6 +1965,20 @@
 
   :global(.air-area-marker) {
     border: 2px solid #ffffff;
+  }
+
+  .logos-section {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #e0ddd5;
+  }
+
+  .org-logo {
+    height: 50px;
+    object-fit: contain;
   }
 
   @keyframes area-fade-in {
