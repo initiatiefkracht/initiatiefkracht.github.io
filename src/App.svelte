@@ -507,6 +507,89 @@
     });
   }
 
+  /** @param {any} value */
+  function normalizeText(value) {
+    if (!value) return "";
+    return String(value)
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/[^a-z0-9 ]/g, "")
+      .replace(/\s+/g, " ");
+  }
+
+  /** @param {any} a
+   *  @param {any} b
+   */
+  function locationDistance(a, b) {
+    return Math.max(
+      Math.abs(Number(a.latitude) - Number(b.latitude)),
+      Math.abs(Number(a.longitude) - Number(b.longitude)),
+    );
+  }
+
+  /** @param {any} place */
+  function detailScore(place) {
+    return Object.values(place).reduce((score, value) => {
+      if (value == null) return score;
+      const str = String(value).trim();
+      return score + (str.length > 0 ? 1 : 0);
+    }, 0);
+  }
+
+  /** @param {any[]} places */
+  function dedupePlaces(places) {
+    const grouped = /** @type {any[][]} */ ([]);
+    const threshold = 0.0002; // ~20 meters
+
+    places.forEach((place) => {
+      const name = normalizeText(place.name || place.naam || "");
+      const lat = Number(place.latitude);
+      const lng = Number(place.longitude);
+      if (!name || Number.isNaN(lat) || Number.isNaN(lng)) {
+        grouped.push(place);
+        return;
+      }
+
+      let matched = null;
+      for (const group of grouped) {
+        const existing = group[0];
+        const existingName = normalizeText(
+          existing.name || existing.naam || "",
+        );
+        const dist = locationDistance(place, existing);
+        if (dist <= threshold) {
+          if (
+            existingName === name ||
+            existingName.includes(name) ||
+            name.includes(existingName)
+          ) {
+            matched = group;
+            break;
+          }
+        }
+      }
+
+      if (matched) {
+        matched.push(place);
+      } else {
+        grouped.push([place]);
+      }
+    });
+
+    /** @param {any[]} group */
+    function pickBestRecord(group) {
+      return group.reduce((best, current) =>
+        detailScore(current) > detailScore(best) ? current : best,
+      );
+    }
+
+    return grouped.map((group) =>
+      group.length === 1 ? group[0] : pickBestRecord(group),
+    );
+  }
+
   function formatGebiedLabel(gebied) {
     if (!gebied) return "Rotterdam";
     const parts = String(gebied)
@@ -552,7 +635,9 @@
       header: true,
       dynamicTyping: true,
       complete: (results) => {
-        allPlaces = results.data.filter((p) => p.latitude && p.longitude);
+        allPlaces = dedupePlaces(
+          results.data.filter((p) => p.latitude && p.longitude),
+        );
 
         const allBuurten = geoData.features
           .map((feature) => feature.properties.buurtnaam)
@@ -691,8 +776,9 @@
 
   $effect(() => {
     if (!map) return;
+    const reversedPlaces = [...filteredPlaces].reverse();
 
-    filteredPlaces.forEach((place) => {
+    reversedPlaces.forEach((place) => {
       const container = document.createElement("div");
       container.className = "marker-container";
 
