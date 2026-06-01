@@ -4,7 +4,6 @@
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
 
-  // --- STATE ---
   let mapContainer = $state();
   let map = $state();
   let mapLoaded = $state(false);
@@ -83,7 +82,6 @@
 
   let isMobile = $state(false);
 
-  // --- MAP OPZETTEN ---
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
@@ -93,10 +91,8 @@
       attributionControl: true,
     });
 
-    // Add navigation controls (zoom, rotate)
     map.addControl(new maplibregl.NavigationControl(), "bottom-right");
 
-    // Add geolocation control (current location)
     map.addControl(
       new maplibregl.GeolocateControl({
         positionOptions: {
@@ -138,7 +134,6 @@
     visualMode = visualMode === mode ? "default" : mode;
   }
 
-  // --- CONFIGURATIES ---
   const POINT_ZOOM = 15.5;
   const AREA_ZOOM = 13;
   const LARGE_AREA_ZOOM = 11;
@@ -210,14 +205,14 @@
   };
 
   const KOEPEL_COLORS = {
-    "Energie van Rotterdam": "#F48A8A", // Energie (iets minder pastel rood/koraal)
-    "Rotterdam Circulair": "#FBBF72", // Circulair (iets minder pastel oranje)
-    Groen010: "#86EFAC", // Groen
-    "De Groene Connectie": "#5EEAD4", // Teal
-    "Rotterdams Weerwoord": "#7DD3FC", // Klimaat blauw
-    "Welzijnscoalitie Delfshaven": "#D8B4FE", // Paars
-    Thuismakerscollectief: "#F9A8D4", // Roze
-    RoCoCo: "#A5B4FC", // Indigo
+    "Energie van Rotterdam": "#F48A8A",
+    "Rotterdam Circulair": "#FBBF72",
+    Groen010: "#86EFAC",
+    "De Groene Connectie": "#5EEAD4",
+    "Rotterdams Weerwoord": "#7DD3FC",
+    "Welzijnscoalitie Delfshaven": "#D8B4FE",
+    Thuismakerscollectief: "#F9A8D4",
+    RoCoCo: "#A5B4FC",
     default: "#5d69fb",
   };
 
@@ -227,12 +222,11 @@
     Groen010: "https://www.groen010.net/",
     "De Groene Connectie": "https://degroeneconnectie.nl/",
     "Rotterdams Weerwoord": "https://www.rotterdamsweerwoord.nl/",
-    "Welzijnscoalitie Delfshaven": "https://welzijnscoalitie.nl/", // Filler
-    Thuismakerscollectief: "https://thuismakerscollectief.nl/", // Filler
-    RoCoCo: "https://rococo.coop/", // Filler
+    "Welzijnscoalitie Delfshaven": "https://welzijnscoalitie.nl/",
+    Thuismakerscollectief: "https://thuismakerscollectief.nl/",
+    RoCoCo: "https://rococo.coop/",
   };
 
-  // --- UI STATE ---
   let openSections = $state({
     info: false,
     gebied: false,
@@ -252,14 +246,13 @@
 
   let hoveredAreaGebieden = $state([]);
 
-  let locationFilterMode = $state("all"); // "points", "areas", or "all"
+  let locationFilterMode = $state("all");
   let searchQuery = $state("");
   let searchFocused = $state(false);
   let highlightedSearchIndex = $state(-1);
   let mobileSidebarOpen = $state(false);
 
   $effect(() => {
-    // Reset index whenever search query changes
     searchQuery;
     highlightedSearchIndex = -1;
   });
@@ -292,7 +285,7 @@
         highlightedSearchIndex < searchSuggestions.length
       ) {
         selectPlaceOnMap(searchSuggestions[highlightedSearchIndex]);
-        searchQuery = ""; // Clear search after selection
+        searchQuery = "";
       }
     }
   }
@@ -315,7 +308,6 @@
       activeMarkerElement = markerEntry.element;
       activeMarkerContainer = markerEntry.container;
       markerEntry.element.classList.add("active-glow");
-      // We zetten z-index op de container zodat de marker bovenop andere markers komt
       markerEntry.container.style.zIndex = "9999";
     } else {
       activeMarkerElement = null;
@@ -323,14 +315,11 @@
     }
 
     const sidebarWidth = 350;
-    const desktopPopupWidth = 320; // CSS width is 300px, + margin
+    const desktopPopupWidth = 320;
 
-    // Dynamische padding die de UI-elementen ontwijkt:
-    // Op desktop: links de sidebar (280px), rechts de popup (320px).
-    // Op mobiel: onderin het menu, bovenin de popup.
     const padding = isMobile
       ? {
-          top: 280, // Ruimte voor de top header (60) + popup (start op 80)
+          top: 280,
           bottom: mobileSidebarOpen ? window.innerHeight * 0.5 + 20 : 60,
           left: 20,
           right: 20,
@@ -342,8 +331,6 @@
           right: desktopPopupWidth + 60,
         };
 
-    // We gebruiken nu padding om te centreren in de vrije ruimte tussen sidebar en popup.
-    // De zoom-logica is nu voor beide gelijk: we vliegen naar de marker-locatie.
     let targetZoom = POINT_ZOOM;
 
     if (place.location_type === "area") {
@@ -373,7 +360,6 @@
       clickedAreaGebieden = [];
     }
   }
-  // zorg dat alleen unieke koepels en enkele koepels in de filter getoond worden
   let uniqueKoepels = $derived(
     [
       ...new Set(
@@ -411,13 +397,11 @@
           .map((g) => g.trim())
           .filter(Boolean);
         const isMultiBuurt = parts.length > 15;
-        // Check if any selected filter matches
+
         matchesGebied = selectedGebieden.some((selected) => {
           if (selected === "Rotterdam") {
-            // Rotterdam matches if: 15+ buurten OR place has Rotterdam in it
             return isMultiBuurt || parts.some((g) => g === "Rotterdam");
           }
-          // Other gebieden: exact match on place
           return selected === p.gebied;
         });
       }
@@ -485,7 +469,6 @@
         const normalized = normalizeBuurtName(part);
         if (normalized === "rotterdam") return "Rotterdam";
         if (buurtMap[normalized]) return buurtMap[normalized];
-        // loose fallback: match on normalized substring if unique
         const candidates = Object.keys(buurtMap).filter(
           (key) => key.includes(normalized) || normalized.includes(key),
         );
@@ -546,14 +529,12 @@
     return () => window.removeEventListener("resize", handleResize);
   });
 
-  // --- DATA INLADEN ---
   onMount(async () => {
     const response = await fetch("initiatieven.csv");
     const csvString = await response.text();
     const geoResponse = await fetch("rotterdam-buurten.json");
     const geoData = await geoResponse.json();
 
-    // Assign numeric IDs for feature-state
     geoData.features.forEach((f, i) => (f.id = i));
     allGeoFeatures = geoData.features;
 
@@ -574,7 +555,6 @@
       complete: (results) => {
         allPlaces = results.data.filter((p) => p.latitude && p.longitude);
 
-        // Breid alle area-initiatieven met gebied "Rotterdam" uit naar alle buurten.
         const allBuurten = geoData.features
           .map((feature) => feature.properties.buurtnaam)
           .filter(Boolean)
@@ -641,7 +621,6 @@
       });
     });
 
-    // Un-highlight features that are no longer highlighted
     highlightedFeatureIds.forEach((id) => {
       if (!nextHighlightedIds.has(id)) {
         map.setFeatureState(
@@ -651,7 +630,6 @@
       }
     });
 
-    // Highlight new features
     nextHighlightedIds.forEach((id) => {
       if (!highlightedFeatureIds.has(id)) {
         map.setFeatureState(
@@ -663,7 +641,6 @@
 
     highlightedFeatureIds = nextHighlightedIds;
 
-    // --- ANIMATION LOOP ---
     const targetOpacities = new Map();
     const duration = 400;
     const maxOpacity = 0.3;
@@ -713,7 +690,6 @@
     opacityAnimationFrame = requestAnimationFrame(animateOpacity);
   });
 
-  // --- MARKERS UPDATEN ---
   $effect(() => {
     if (!map) return;
 
@@ -816,16 +792,13 @@
     return [...list, value];
   }
 
-  // --- Zet dit ergens los op root-niveau in je script ---
   $effect(() => {
     if (isMobile && selectedPlace && map) {
-      // Re-trigger map positioning whenever mobile sidebar is opened or closed
       mobileSidebarOpen;
       activatePlaceOnMap(selectedPlace);
     }
   });
 
-  // --- Schone versie van uniqueGebieden ---
   let uniqueGebieden = $derived.by(() => {
     const gebieden = new Set();
     allPlaces.forEach((p) => {
@@ -1056,48 +1029,6 @@
           </div>
         {/if}
       </div>
-
-      <!-- <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("gebied")}
-        >
-          <span>Gebied</span>
-          <span class="icon">{openSections.gebied ? "−" : "+"}</span>
-        </button>
-        {#if openSections.gebied}
-          <div class="accordion-content"> -->
-      <!-- <div class="visual-toggle-container">
-            <span class="toggle-text">Toon kleuren per gebied</span>
-            <label class="switch">
-              <input
-                type="checkbox"
-                checked={visualMode === "gebied"}
-                onchange={() => handleVisualToggle("gebied")}
-              />
-              <span class="slider"></span>
-            </label>
-          </div> -->
-      <!-- <hr class="separator" />
-            {#each uniqueGebieden as gebied}
-              <label class="filter-item">
-                <input
-                  type="checkbox"
-                  checked={selectedGebieden.includes(gebied)}
-                  onchange={() =>
-                    (selectedGebieden = toggleFilter(selectedGebieden, gebied))}
-                />
-                <span class="filter-text">{gebied}</span>
-                <span
-                  class="color-swatch"
-                  style="background-color: {GEBIED_COLORS[gebied] ||
-                    GEBIED_COLORS.default}"
-                ></span>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      </div> -->
 
       <div class="accordion">
         <button
@@ -1569,7 +1500,7 @@
     }
 
     :global(.maplibregl-ctrl-bottom-right) {
-      bottom: 90px !important; /* Netjes boven de toggle-knop */
+      bottom: 90px !important;
     }
 
     .filter-item {
@@ -1628,7 +1559,7 @@
   }
   .search-input:focus {
     outline: none;
-    /* border-color: #5d69fb; */
+
     box-shadow: 0 0 0 3px rgba(93, 105, 251, 0.15);
   }
   .search-suggestions {
@@ -1835,7 +1766,7 @@
     position: absolute;
     top: 12px;
     right: 20px;
-    /* ensure we don't get forced too far down on iOS */
+
     bottom: auto;
 
     width: 300px;
@@ -1846,7 +1777,7 @@
       0 10px 30px rgba(0, 0, 0, 0.1),
       5px 5px 0px rgba(132, 80, 255, 0.15);
     z-index: 2000;
-    /* animation: popup-slide-in 0.3s cubic-bezier(0.1, 1, 0.1, 1); */
+
     font-family: "Helvetica", Arial, sans-serif;
     text-align: left;
     overflow-y: auto;
@@ -1978,7 +1909,6 @@
     background: #fbf9f9;
   }
 
-  /* POINT MARKERS (Oude stijl met border) */
   :global(.marker-container) {
     z-index: 100;
   }
@@ -2025,7 +1955,6 @@
     transform: scale(1.1);
   }
 
-  /* AREA MARKERS: Transparent style to blend with background */
   :global(.air-area-marker) {
     border: 2px solid #ffffff;
   }
@@ -2054,7 +1983,6 @@
     text-align: center;
   }
 
-  /* Legend items in location-filter */
   .location-filter .filter-item {
     justify-content: space-between;
   }
