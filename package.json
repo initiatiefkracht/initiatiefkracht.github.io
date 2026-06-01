@@ -6,15 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "npm run build && wrangler deploy"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.39.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "svelte": "^5.45.2",
-    "vite": "^8.0.0-beta.13"
+    "vite": "^8.0.0-beta.13",
+    "wrangler": "^4.95.0"
   },
   "overrides": {
     "vite": "^8.0.0-beta.13"
