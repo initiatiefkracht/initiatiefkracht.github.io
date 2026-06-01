@@ -15,7 +15,6 @@
   let currentOpacities = new Map();
   let opacityAnimationFrame = null;
 
-  /** @type {any} */
   let selectedPlace = $state(null);
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
