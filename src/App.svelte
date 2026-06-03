@@ -1246,10 +1246,20 @@
       </button>
     {/if}
 
-    <div class="qr-block">
-      <p>Scan deze qr code om de kaart te ontdekken!</p>
-      <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
+    <div class="qr-info">
+      <p>
+        Op de kaart vind je slechts een kleine verzameling van de
+        initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling, dus
+        als je een initiatief mist, laat hem achter in de ideeënbus!
+      </p>
     </div>
+
+    {#if !isMobile}
+      <div class="qr-block">
+        <p>Scan deze qr code om de kaart te ontdekken!</p>
+        <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
+      </div>
+    {/if}
 
     <div class="stats">
       <strong>{filteredPlaces.length}</strong> initiatieven getoond
@@ -1786,6 +1796,24 @@
     background: #fbf9f9;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
+  }
+  .qr-block {
+    padding: 16px 20px;
+    background: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: center;
+  }
+  .qr-info {
+    padding: 16px 20px;
+    background: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #666;
+  }
+  .qr-info p {
+    margin: 0;
+    text-align: left;
   }
   .qr-block {
     padding: 16px 20px;
