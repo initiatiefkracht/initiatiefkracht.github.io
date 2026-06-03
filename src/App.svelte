@@ -1251,7 +1251,8 @@
         <p>
           Op de kaart vind je slechts een kleine verzameling van de
           initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling, dus
-          als je een initiatief mist, laat hem achter in de ideeënbus!
+          als je een initiatief mist, laat hem achter in de ideeënbus op de
+          tafel!
         </p>
       </div>
     {/if}
