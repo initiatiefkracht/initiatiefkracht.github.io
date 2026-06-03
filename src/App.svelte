@@ -1246,13 +1246,15 @@
       </button>
     {/if}
 
-    <div class="qr-info">
-      <p>
-        Op de kaart vind je slechts een kleine verzameling van de
-        initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling, dus
-        als je een initiatief mist, laat hem achter in de ideeënbus!
-      </p>
-    </div>
+    {#if !isMobile}
+      <div class="qr-info">
+        <p>
+          Op de kaart vind je slechts een kleine verzameling van de
+          initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling, dus
+          als je een initiatief mist, laat hem achter in de ideeënbus!
+        </p>
+      </div>
+    {/if}
 
     {#if !isMobile}
       <div class="qr-block">
@@ -1807,9 +1809,10 @@
     padding: 16px 20px;
     background: transparent;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+    color: #5d69fb;
   }
   .qr-info p {
     margin: 0;
