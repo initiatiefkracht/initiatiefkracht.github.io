@@ -903,7 +903,7 @@
 </script>
 
 <div class="layout" onclick={closePopup} role="presentation">
-  <div class="mobile-header">Initiatievenkaart</div>
+  <div class="mobile-header">In opbouw: "Initiatiefkracht in kaart"</div>
   <aside
     class="sidebar"
     class:open={mobileSidebarOpen}
@@ -926,7 +926,10 @@
         <span class="menu-text">menu</span>
       </div>
     </button>
-    <div class="brand">Initiatievenkaart</div>
+    <div class="brand">
+      IN OPBOUW: <br />
+      Initiatiefkracht in kaart
+    </div>
 
     <div class="sidebar-inner">
       <div class="search-group">
@@ -1075,8 +1078,8 @@
               <div class="accordion-divider"></div>
               <div class="intro-section">
                 <p>
-                  Deze kaart is ontwikkeld door AIR, voor de Stadmakersacademie.
-                  In samenwerking met Groen010 is de data vergaard.
+                  Deze kaart is ontwikkeld door AIR, in samenwerking met
+                  Groen010.
                 </p>
                 <div class="logos-section">
                   <img src="AIR.png" alt="AIR logo" class="org-logo" />
@@ -1242,6 +1245,11 @@
         <span>Reset filters</span>
       </button>
     {/if}
+
+    <div class="qr-block">
+      <p>Scan deze qr code om de kaart te ontdekken!</p>
+      <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
+    </div>
 
     <div class="stats">
       <strong>{filteredPlaces.length}</strong> initiatieven getoond
@@ -1778,6 +1786,29 @@
     background: #fbf9f9;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
+  }
+  .qr-block {
+    padding: 16px 20px;
+    background: transparent;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    text-align: center;
+  }
+  .qr-block p {
+    margin: 0 0 12px;
+    font-family: inherit;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05rem;
+    color: #5d69fb;
+    text-align: left;
+    outline: none;
+  }
+  .qr-block img {
+    width: 100%;
+    max-width: 160px;
+    display: block;
+    margin: 0 auto;
   }
   .stats strong {
     color: #5d69fb;
