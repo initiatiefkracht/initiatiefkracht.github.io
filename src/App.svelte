@@ -80,6 +80,7 @@
   }
 
   let isMobile = $state(false);
+  let showQrBlock = $state(true);
 
   function initMap(geoData) {
     map = new maplibregl.Map({
@@ -1246,24 +1247,6 @@
       </button>
     {/if}
 
-    {#if !isMobile}
-      <div class="qr-info">
-        <p>
-          Op de kaart vind je slechts een kleine verzameling van de
-          initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling, dus
-          als je een initiatief mist, laat hem achter in de ideeënbus op de
-          tafel!
-        </p>
-      </div>
-    {/if}
-
-    {#if !isMobile}
-      <div class="qr-block">
-        <p>Scan deze qr code om de kaart te ontdekken!</p>
-        <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
-      </div>
-    {/if}
-
     <div class="stats">
       <strong>{filteredPlaces.length}</strong> initiatieven getoond
     </div>
@@ -1302,6 +1285,33 @@
   {/if}
 
   <div class="map-container" bind:this={mapContainer}>
+    {#if !isMobile && showQrBlock}
+      <div class="floating-qr-block">
+        <button
+          class="qr-close-btn"
+          onclick={() => (showQrBlock = false)}
+          aria-label="Sluiten"
+        >
+          <i class="ph ph-x"></i>
+        </button>
+        <div class="qr-content">
+          <p class="qr-info-text">
+            Op de kaart vind je slechts een kleine verzameling van de
+            initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
+            dus als je een initiatief mist, laat hem achter in de ideeënbus!
+          </p>
+
+          <div class="qr-code-wrap">
+            <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
+          </div>
+
+          <p class="qr-scan-text">
+            Scan deze qr code om de kaart te ontdekken!
+          </p>
+        </div>
+      </div>
+    {/if}
+
     {#if selectedPlace}
       <div
         class="fixed-air-popup"
@@ -1804,7 +1814,7 @@
     padding: 16px 20px;
     background: transparent;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
-    text-align: center;
+    text-align: left;
   }
   .qr-info {
     padding: 16px 20px;
@@ -1819,29 +1829,80 @@
     margin: 0;
     text-align: left;
   }
-  .qr-block {
-    padding: 16px 20px;
+  .floating-qr-block {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 24px;
+    width: fit-content;
+    max-width: 70%;
+    z-index: 999;
+  }
+  .qr-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border: none;
     background: transparent;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    text-align: center;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 20px;
+    transition: color 0.2s ease;
   }
-  .qr-block p {
-    margin: 0 0 12px;
-    font-family: inherit;
-    font-weight: 800;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    letter-spacing: 0.05rem;
+  .qr-close-btn:hover {
     color: #5d69fb;
+  }
+  .qr-content {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .qr-info-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+    color: #666;
+    margin: 0;
     text-align: left;
-    outline: none;
+    max-width: 320px;
   }
-  .qr-block img {
-    width: 100%;
-    max-width: 160px;
+
+  .qr-code-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .qr-code-wrap img {
+    max-width: 120px;
+    width: 120px;
     display: block;
-    margin: 0 auto;
   }
+
+  .qr-scan-text {
+    font-size: 0.85rem;
+    margin: 0;
+    color: #5d69fb;
+    font-weight: 500;
+    line-height: 1.6;
+    text-align: left;
+    width: 110px;
+    flex-shrink: 0;
+  }
+
+  /* legacy selectors kept for compatibility with other layout variants */
+
   .stats strong {
     color: #5d69fb;
     font-size: 0.85rem;
