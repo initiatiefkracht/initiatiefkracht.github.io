@@ -1402,10 +1402,20 @@
     max-width: none !important;
   }
 
+  /* Vervang je huidige html/body regel door: */
+  :global(html),
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+  }
+
   .layout {
     display: flex;
-    width: 100vw;
-    height: 100vh;
+    width: 100%; /* was: 100vw — dit veroorzaakte de horizontale scrollbar */
+    height: 100%; /* was: 100vh */
     position: fixed;
     top: 0;
     left: 0;
