@@ -1903,7 +1903,7 @@
   .qr-scan-text {
     font-size: 0.85rem;
     margin: 0;
-    color: #5d69fb;
+    color: #000;
     font-weight: 500;
     line-height: 1.6;
     text-align: left;
