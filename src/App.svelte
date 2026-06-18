@@ -322,13 +322,13 @@
           top: 280,
           bottom: mobileSidebarOpen ? window.innerHeight * 0.5 + 20 : 60,
           left: 20,
-          right: 20,
+          right: 60,
         }
       : {
           top: 60,
           bottom: 60,
-          left: sidebarWidth + 60,
-          right: desktopPopupWidth + 60,
+          left: sidebarWidth + 40,
+          right: desktopPopupWidth + 160,
         };
 
     let targetZoom = POINT_ZOOM;
@@ -806,6 +806,8 @@
 
       if (isArea) {
         el.style.backgroundColor = "#5d69fb";
+        el.style.opacity = "0.55";
+        el.style.borderColor = "#5d69fb80";
         if (visualMode === "gebied") {
           const gebiedKey = place.gebied || "default";
           el.style.borderColor =
@@ -817,7 +819,7 @@
           el.style.borderColor =
             KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
         } else {
-          el.style.borderColor = "#ffffff";
+          el.style.borderColor = "#5d69fb80";
         }
         const areaGebieden = (place.gebied || "")
           .split(";")
@@ -2182,7 +2184,7 @@
   }
 
   :global(.air-area-marker) {
-    border: 2px solid #ffffff;
+    /* border: 2px solid #ffffff; */
   }
 
   .logos-section {
@@ -2248,7 +2250,7 @@
 
   .legend-marker-area {
     background: #5d69fb;
-    border: 2px solid #ffffff;
+    /* border: 2px solid #ffffff; */
   }
 
   .legend-marker-koepel {
