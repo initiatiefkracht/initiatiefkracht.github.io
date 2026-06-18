@@ -2185,8 +2185,17 @@
 
   :global(.air-area-marker) {
     /* border: 2px solid #ffffff; */
+    box-shadow:
+      0 0 0 3px #5d69fb90,
+      0 0 15px 8px rgba(132, 80, 255, 0.1),
+      0 2px 6px rgba(0, 0, 0, 0.2);
+    min-width: 24px;
+    height: 24px;
   }
 
+  :global(.air-area-marker i) {
+    font-size: 12px;
+  }
   .logos-section {
     display: flex;
     justify-content: center;
@@ -2250,7 +2259,14 @@
 
   .legend-marker-area {
     background: #5d69fb;
-    /* border: 2px solid #ffffff; */
+    box-shadow:
+      0 0 0 3px #5d69fb90,
+      0 0 15px 8px rgba(132, 80, 255, 0.1),
+      0 2px 6px rgba(0, 0, 0, 0.2);
+    border: none;
+    opacity: 0.6;
+    max-width: 18px;
+    max-height: 18px;
   }
 
   .legend-marker-koepel {
