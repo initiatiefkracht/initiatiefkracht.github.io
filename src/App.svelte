@@ -116,15 +116,52 @@
           source: "rotterdam-buurten",
           paint: {
             "fill-color": "#5d69fb",
-            "fill-opacity": [
-              "coalesce",
-              ["feature-state", "highlightOpacity"],
-              0,
-            ],
+            "fill-opacity": 0,
           },
         },
         "watername_ocean",
       );
+
+      // Re-introduce canvas pattern registration for neighborhood fills matching the blobs
+      const createDynamicPattern = (id, domeinList, angleDeg) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 24;
+        canvas.height = 24;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const colors = domeinList.map(
+          (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
+        );
+        if (colors.length === 0) colors.push(DOMEIN_COLORS.default);
+
+        ctx.clearRect(0, 0, 24, 24);
+
+        ctx.save();
+        ctx.translate(12, 12);
+        ctx.rotate((angleDeg * Math.PI) / 180);
+        ctx.translate(-12, -12);
+
+        // Draw thin stripes alternating with transparent gaps matching the blob definition
+        const stripeWidth = 2;
+        const gapWidth = 4;
+        const totalW = stripeWidth + gapWidth;
+
+        for (let x = -24; x < 48; x += totalW * colors.length) {
+          colors.forEach((color, index) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(x + index * totalW, -24, stripeWidth, 72);
+          });
+        }
+        ctx.restore();
+
+        const imgData = ctx.getImageData(0, 0, 24, 24);
+        if (!map.hasImage(id)) {
+          map.addImage(id, imgData);
+        }
+      };
+
+      window._mapCanvasPatterns = createDynamicPattern;
 
       mapLoaded = true;
     });
@@ -162,6 +199,132 @@
     Mobiliteit: "ph-bicycle",
     Energie: "ph-lightning",
     default: "ph-map-pin",
+  };
+
+  const createHexagonSVG = (domeinen, borderColor, isArea) => {
+    const domeinList = [
+      ...new Set((domeinen || "").split(";").map((d) => d.trim())),
+    ].filter(Boolean);
+    const N = domeinList.length;
+    const colors = [];
+
+    if (N === 0) {
+      for (let i = 0; i < 6; i++) colors.push(DOMEIN_COLORS.default);
+    } else {
+      const perDomain = Math.floor(6 / N);
+      const remainder = 6 % N;
+      domeinList.forEach((d, i) => {
+        let count = perDomain;
+        if (i === 0) count += remainder;
+        const color = DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
+        for (let j = 0; j < count; j++) {
+          colors.push(color);
+        }
+      });
+    }
+
+    const R = 8; // Radius
+    const cx = 13;
+    const cy = 13;
+
+    const points = [];
+    for (let i = 0; i < 6; i++) {
+      const angle_deg = 60 * i - 90; // Pointy top
+      const angle_rad = (Math.PI / 180) * angle_deg;
+      points.push({
+        x: cx + R * Math.cos(angle_rad),
+        y: cy + R * Math.sin(angle_rad),
+      });
+    }
+
+    let trianglesHtml = "";
+    for (let i = 0; i < 6; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % 6];
+      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+    }
+
+    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1" />`;
+
+    const opacity = isArea ? 0.75 : 1;
+
+    return `<svg width="26" height="26" viewBox="0 0 26 26" style="display: block; opacity: ${opacity};">
+      ${trianglesHtml}
+      ${borderHtml}
+    </svg>`;
+  };
+
+  const createBlobSVG = (domeinen, index, borderColor) => {
+    const domeinList = [
+      ...new Set((domeinen || "").split(";").map((d) => d.trim())),
+    ].filter(Boolean);
+    const colors = domeinList.map(
+      (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
+    );
+    if (colors.length === 0) colors.push(DOMEIN_COLORS.default);
+
+    // Generate unique pseudo-random offsets based on index to create unique organic shapes
+    const numPoints = 8;
+    const center = 40;
+    const baseRadius = 26;
+    const points = [];
+
+    // Simple deterministic LCG pseudo-random function based on index
+    let seed = index + 1;
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) % 4294967296;
+      return seed / 4294967296;
+    };
+
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i * 2 * Math.PI) / numPoints;
+      // Vary radius to create a unique organic blob shape
+      const radius = baseRadius + (rnd() * 12 - 6);
+      const x = center + radius * Math.cos(angle);
+      const y = center + radius * Math.sin(angle);
+      points.push({ x, y });
+    }
+
+    // Build smooth Catmull-Rom or cubic Bezier path string around the points
+    let pathD = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < numPoints; i++) {
+      const p0 = points[(i - 1 + numPoints) % numPoints];
+      const p1 = points[i];
+      const p2 = points[(i + 1) % numPoints];
+      const p3 = points[(i + 2) % numPoints];
+
+      // Control points for smooth curves
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    pathD += " Z";
+
+    // Build the dynamic pattern for stripes inside the SVG definitions
+    const patternId = `svg-pattern-${index}-${domeinList.join("-")}`;
+    const stripeWidth = 0.5; // Thinner colored stripes
+    const gapWidth = 1; // Transparent gap width to alternate and allow visibility underneath
+    const totalPatternWidth = colors.length * (stripeWidth + gapWidth);
+    const patternAngle = 30 + ((index * 25) % 120); // Vary angles to distinguish overlapping blobs
+
+    let patternContents = "";
+    colors.forEach((color, idx) => {
+      const startX = idx * (stripeWidth + gapWidth);
+      patternContents += `<rect x="${startX}" y="0" width="${stripeWidth}" height="100" fill="${color}" />`;
+    });
+
+    return `<svg width="80" height="80" viewBox="0 0 80 80" style="display: block; overflow: visible;">
+      <defs>
+        <pattern id="${patternId}" width="${totalPatternWidth}" height="100" patternUnits="userSpaceOnUse" patternTransform="rotate(${patternAngle})">
+          ${patternContents}
+        </pattern>
+      </defs>
+      <path d="${pathD}" fill="url(#${patternId})" stroke="none" opacity="0.9" />
+    </svg>`;
   };
 
   const GEBIED_COLORS = {
@@ -245,6 +408,7 @@
   let clickedAreaGebieden = $state([]);
 
   let hoveredAreaGebieden = $state([]);
+  let hoveredPlace = $state(null);
 
   let locationFilterMode = $state("all");
   let searchQuery = $state("");
@@ -684,169 +848,172 @@
     selectedPlace = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
+    hoveredPlace = null;
     clickedAreaGebieden = [];
   }
 
-  let highlightedFeatureIds = new Set();
+  let currentHighlightLayers = [];
+
   $effect(() => {
     if (!mapLoaded || !map) return;
+
+    // Clean up older highlight layers/sources
+    currentHighlightLayers.forEach((id) => {
+      if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getLayer(`${id}-outline`)) map.removeLayer(`${id}-outline`);
+      if (map.getSource(id)) map.removeSource(id);
+    });
+    currentHighlightLayers = [];
 
     const areas = filteredPlaces.filter((p) => p.location_type === "area");
     const hoveredSet = new Set(hoveredAreaGebieden);
     const clickedSet = new Set(clickedAreaGebieden);
 
-    const nextHighlightedIds = new Set();
-    areas.forEach((p) => {
+    areas.forEach((p, idx) => {
+      if (p !== hoveredPlace && p !== selectedPlace) return;
+
       const gebieden = p.gebied.split(";").map((g) => g.trim());
-      gebieden.forEach((gebied) => {
-        if (hoveredSet.has(gebied) || clickedSet.has(gebied)) {
-          const ids = buurtToFeatureIds.get(gebied) || [];
-          ids.forEach((id) => nextHighlightedIds.add(id));
-        }
-      });
-    });
 
-    highlightedFeatureIds.forEach((id) => {
-      if (!nextHighlightedIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: false },
-        );
+      // Check if this area matches any hovered or clicked neighborhood
+      const activeGebieden = gebieden.filter(
+        (g) => hoveredSet.has(g) || clickedSet.has(g),
+      );
+      if (activeGebieden.length === 0) return;
+
+      const domeinList = [
+        ...new Set((p.domeinen || "").split(";").map((d) => d.trim())),
+      ].filter(Boolean);
+
+      const patternId = `map-canvas-pattern-${idx}-${domeinList.join("-")}`;
+      const patternAngle = 30 + ((idx * 25) % 120);
+
+      if (window._mapCanvasPatterns) {
+        window._mapCanvasPatterns(patternId, domeinList, patternAngle);
       }
-    });
 
-    nextHighlightedIds.forEach((id) => {
-      if (!highlightedFeatureIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: true },
-        );
-      }
-    });
-
-    highlightedFeatureIds = nextHighlightedIds;
-
-    const targetOpacities = new Map();
-    const duration = 400;
-    const maxOpacity = 0.3;
-
-    nextHighlightedIds.forEach((id) => targetOpacities.set(id, maxOpacity));
-
-    currentOpacities.forEach((_, id) => {
-      if (!targetOpacities.has(id)) {
-        targetOpacities.set(id, 0);
-      }
-    });
-
-    if (opacityAnimationFrame) cancelAnimationFrame(opacityAnimationFrame);
-
-    const startTime = performance.now();
-    const startOpacities = new Map(currentOpacities);
-
-    function animateOpacity(time) {
-      const progress = Math.min((time - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 2);
-
-      let needsNextFrame = false;
-
-      targetOpacities.forEach((targetVal, id) => {
-        const startVal = startOpacities.get(id) || 0;
-        const currentVal = startVal + (targetVal - startVal) * ease;
-
-        currentOpacities.set(id, currentVal);
-
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlightOpacity: currentVal },
-        );
-
-        if (progress < 1) {
-          needsNextFrame = true;
-        } else if (targetVal === 0) {
-          currentOpacities.delete(id);
-        }
+      // Collect features for active neighborhoods
+      const features = [];
+      activeGebieden.forEach((gebied) => {
+        const ids = buurtToFeatureIds.get(gebied) || [];
+        ids.forEach((id) => {
+          const originalFeat = allGeoFeatures[id];
+          if (originalFeat) {
+            features.push(JSON.parse(JSON.stringify(originalFeat)));
+          }
+        });
       });
 
-      if (needsNextFrame) {
-        opacityAnimationFrame = requestAnimationFrame(animateOpacity);
-      }
-    }
+      if (features.length > 0) {
+        const sourceId = `hover-highlight-src-${idx}`;
 
-    opacityAnimationFrame = requestAnimationFrame(animateOpacity);
+        map.addSource(sourceId, {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: features,
+          },
+        });
+
+        map.addLayer(
+          {
+            id: sourceId,
+            type: "fill",
+            source: sourceId,
+            paint: {
+              "fill-pattern": patternId,
+              "fill-opacity": 0.7,
+            },
+          },
+          "buurten-fill",
+        );
+
+        // Add subtle definition outline matching visual mode colors
+        let borderColor = "#5d69fb";
+        if (visualMode === "gebied") {
+          const gebiedKey = p.gebied || "default";
+          borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
+        } else if (visualMode === "koepel") {
+          const koepelKey =
+            (p.koepels || "").split(";").map((k) => k.trim())[0] || "default";
+          borderColor = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
+        }
+
+        map.addLayer(
+          {
+            id: `${sourceId}-outline`,
+            type: "line",
+            source: sourceId,
+            paint: {
+              "line-color": borderColor,
+              "line-width": p === selectedPlace ? 3 : 1.5,
+            },
+          },
+          "buurten-fill",
+        );
+
+        currentHighlightLayers.push(sourceId);
+      }
+    });
+
+    return () => {
+      currentHighlightLayers.forEach((id) => {
+        if (map.getLayer(id)) map.removeLayer(id);
+        if (map.getLayer(`${id}-outline`)) map.removeLayer(`${id}-outline`);
+        if (map.getSource(id)) map.removeSource(id);
+      });
+      currentHighlightLayers = [];
+    };
   });
 
   $effect(() => {
-    if (!map) return;
+    if (!map || !mapLoaded) return;
     const reversedPlaces = [...filteredPlaces].reverse();
 
-    reversedPlaces.forEach((place) => {
+    // Render markers for all places (both points and areas)
+    reversedPlaces.forEach((place, index) => {
       const container = document.createElement("div");
       container.className = "marker-container";
 
       const el = document.createElement("div");
       const isArea = place.location_type === "area";
 
-      el.className = "air-marker";
-      if (isArea) el.classList.add("air-area-marker");
-      const domeinList = [
-        ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
-      ];
+      el.className = isArea ? "air-area-blob-marker" : "air-marker";
 
-      let iconsHtml = "";
-      domeinList.forEach((d) => {
-        const iconColor = isArea
-          ? "#ffffff"
-          : DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
-        const iconClass = DOMEIN_ICONS[d] || DOMEIN_ICONS.default;
-        iconsHtml += `<i class="ph ${iconClass}" style="color: ${iconColor};"></i>`;
-      });
-
-      el.innerHTML = iconsHtml;
-      container.appendChild(el);
+      let borderColor = "#737ac6";
+      if (visualMode === "gebied") {
+        const gebiedKey = place.gebied || "default";
+        borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
+      } else if (visualMode === "koepel") {
+        const koepelKey =
+          (place.koepels || "").split(";").map((k) => k.trim())[0] || "default";
+        borderColor = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
+      }
 
       if (isArea) {
-        el.style.backgroundColor = "#5d69fb";
-        el.style.opacity = "0.55";
-        el.style.borderColor = "#5d69fb80";
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#5d69fb80";
-        }
+        el.innerHTML = createBlobSVG(
+          place.domeinen,
+          index,
+          place === selectedPlace ? "#5d69fb" : borderColor,
+        );
+
         const areaGebieden = (place.gebied || "")
           .split(";")
           .map((g) => g.trim());
         el.addEventListener("mouseenter", () => {
+          hoveredPlace = place;
           hoveredAreaGebieden = areaGebieden.filter(Boolean);
         });
 
         el.addEventListener("mouseleave", () => {
+          hoveredPlace = null;
           hoveredAreaGebieden = [];
         });
       } else {
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#737ac6";
-        }
-        el.style.backgroundColor = "#ffffff";
+        el.innerHTML = createHexagonSVG(place.domeinen, borderColor, false);
       }
+
+      container.appendChild(el);
+      container.style.zIndex = isArea ? "100" : "200";
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2145,57 +2312,57 @@
   }
 
   :global(.air-marker) {
-    min-width: 26px;
-    height: 26px;
-    border: 2px solid #737ac6;
-    border-radius: 13px;
+    min-width: 20px;
+    height: 20px;
     cursor: pointer;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-    background: #ffffff;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 0 4px;
     box-sizing: border-box;
+    z-index: 200; /* Ensure points are above areas */
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-      box-shadow 0.25s ease,
-      border-color 0.25s ease;
-  }
-
-  :global(.air-marker i) {
-    font-size: 14px;
-    line-height: 1;
+      filter 0.25s ease;
   }
 
   :global(.marker-container:hover .air-marker) {
     transform: scale(1.3);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+    z-index: 1001;
   }
 
   :global(.air-marker.active-glow) {
-    border: 2.5px solid #5d69fb;
-    box-shadow:
-      0 0 0 3px #5d69fb33,
-      0 0 15px 8px rgba(132, 80, 255, 0.15),
-      0 2px 6px rgba(0, 0, 0, 0.2);
-    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px #5d69fb);
+    transform: scale(1.2);
+    z-index: 1002;
   }
 
   :global(.air-area-marker) {
-    /* border: 2px solid #ffffff; */
-    box-shadow:
-      0 0 0 3px #5d69fb90,
-      0 0 15px 8px rgba(132, 80, 255, 0.1),
-      0 2px 6px rgba(0, 0, 0, 0.2);
     min-width: 24px;
     height: 24px;
   }
 
-  :global(.air-area-marker i) {
-    font-size: 12px;
+  :global(.air-area-blob-marker) {
+    width: 80px;
+    height: 80px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    z-index: 100; /* Areas always behind points */
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
+
+  :global(.marker-container:hover .air-area-blob-marker) {
+    transform: scale(1.25);
+  }
+
+  :global(.air-area-blob-marker.active-glow path) {
+    filter: drop-shadow(0 0 5px #5d69fb) drop-shadow(0 0 10px #5d69fb);
+  }
+
   .logos-section {
     display: flex;
     justify-content: center;
@@ -2252,7 +2419,7 @@
     margin-left: 0;
     box-sizing: border-box;
     background: #fff;
-    border: 2px solid #737ac6;
+    border: 1px solid #737ac6;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     flex: 0 0 auto;
   }
