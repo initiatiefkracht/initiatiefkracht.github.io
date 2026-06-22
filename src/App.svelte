@@ -201,7 +201,12 @@
     default: "ph-map-pin",
   };
 
-  const createHexagonSVG = (domeinen, borderColor, isArea) => {
+  const createHexagonSVG = (
+    domeinen,
+    borderColor,
+    isArea,
+    isSelected = false,
+  ) => {
     const domeinList = [
       ...new Set((domeinen || "").split(";").map((d) => d.trim())),
     ].filter(Boolean);
@@ -223,36 +228,109 @@
       });
     }
 
-    const R = 8; // Radius
-    const cx = 13;
-    const cy = 13;
+    if (isArea) {
+      const size = 30;
+      const R = 10;
+      const cx = size / 2;
+      const cy = size / 2;
 
-    const points = [];
-    for (let i = 0; i < 6; i++) {
-      const angle_deg = 60 * i - 90; // Pointy top
-      const angle_rad = (Math.PI / 180) * angle_deg;
-      points.push({
-        x: cx + R * Math.cos(angle_rad),
-        y: cy + R * Math.sin(angle_rad),
+      const hexPoints = (radius) => {
+        const pts = [];
+        for (let i = 0; i < 6; i++) {
+          const angle_rad = (Math.PI / 180) * (60 * i - 90);
+          pts.push({
+            x: cx + radius * Math.cos(angle_rad),
+            y: cy + radius * Math.sin(angle_rad),
+          });
+        }
+        return pts;
+      };
+
+      const points = hexPoints(R);
+
+      let trianglesHtml = "";
+      for (let i = 0; i < 6; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % 6];
+        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+      }
+
+      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" />`;
+
+      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="12" fill="#ffffff" />`;
+
+      const rings = [
+        { r: 14,    maxOp: 0.55, sw: 4.0 },
+        { r: 17.75, maxOp: 0.38, sw: 3.5 },
+        { r: 21,    maxOp: 0.24, sw: 3.0 },
+        { r: 23.75, maxOp: 0.13, sw: 2.5 },
+        { r: 26,    maxOp: 0.06, sw: 2.0 },
+        { r: 27.75, maxOp: 0.03, sw: 1.5 },
+      ];
+      let ringsHtml = "";
+      rings.forEach(({ r, maxOp, sw }, ri) => {
+        ringsHtml += `<circle class="hex-ring hex-ring-${ri + 1}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${borderColor}" stroke-width="${sw}" style="--ring-op:${maxOp};" />`;
       });
+
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:0.85;overflow:visible;">
+        ${ringsHtml}
+        ${bgCircleHtml}
+        ${trianglesHtml}
+        ${borderHtml}
+      </svg>`;
+    } else {
+      const size = 32;
+      const cx = 16;
+      const cy = 12;
+      const R = 6.2;
+
+      const hexPoints = (radius) => {
+        const pts = [];
+        for (let i = 0; i < 6; i++) {
+          const angle_rad = (Math.PI / 180) * (60 * i - 90);
+          pts.push({
+            x: cx + radius * Math.cos(angle_rad),
+            y: cy + radius * Math.sin(angle_rad),
+          });
+        }
+        return pts;
+      };
+
+      const points = hexPoints(R);
+
+      let trianglesHtml = "";
+      for (let i = 0; i < 6; i++) {
+        const p1 = points[i];
+        const p2 = points[(i + 1) % 6];
+        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+      }
+
+      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="#777" stroke-width="0.75" />`;
+
+      const pinFill = "#ffffff";
+      let pinStroke = "#ffffff";
+
+      if (borderColor === "#ffffff") {
+        pinStroke = "#ffffff";
+      }
+
+      if (isSelected) {
+        pinStroke = "#ffffff";
+      }
+
+      const strokeWidth = isSelected ? 1 : 0.5;
+
+      const pinPath = `M 16 2 C 10.5 2 6 6.5 6 12 C 6 18.5 16 30 16 30 C 16 30 26 18.5 26 12 C 26 6.5 21.5 2 16 2 Z`;
+
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
+        <path d="${pinPath}" fill="${pinFill}" stroke="${pinStroke}" stroke-width="${strokeWidth}" />
+        <circle cx="${cx}" cy="${cy}" r="8.2" fill="#ffffff" />
+        ${trianglesHtml}
+        ${borderHtml}
+      </svg>`;
     }
-
-    let trianglesHtml = "";
-    for (let i = 0; i < 6; i++) {
-      const p1 = points[i];
-      const p2 = points[(i + 1) % 6];
-      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
-    }
-
-    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1" />`;
-
-    const opacity = isArea ? 0.75 : 1;
-
-    return `<svg width="26" height="26" viewBox="0 0 26 26" style="display: block; opacity: ${opacity};">
-      ${trianglesHtml}
-      ${borderHtml}
-    </svg>`;
   };
 
   const createBlobSVG = (domeinen, index, borderColor) => {
@@ -866,30 +944,16 @@
     currentHighlightLayers = [];
 
     const areas = filteredPlaces.filter((p) => p.location_type === "area");
-    const hoveredSet = new Set(hoveredAreaGebieden);
     const clickedSet = new Set(clickedAreaGebieden);
 
     areas.forEach((p, idx) => {
-      if (p !== hoveredPlace && p !== selectedPlace) return;
+      if (p !== selectedPlace) return;
 
       const gebieden = p.gebied.split(";").map((g) => g.trim());
 
-      // Check if this area matches any hovered or clicked neighborhood
-      const activeGebieden = gebieden.filter(
-        (g) => hoveredSet.has(g) || clickedSet.has(g),
-      );
+      // Check if this area matches any clicked neighborhood
+      const activeGebieden = gebieden.filter((g) => clickedSet.has(g));
       if (activeGebieden.length === 0) return;
-
-      const domeinList = [
-        ...new Set((p.domeinen || "").split(";").map((d) => d.trim())),
-      ].filter(Boolean);
-
-      const patternId = `map-canvas-pattern-${idx}-${domeinList.join("-")}`;
-      const patternAngle = 30 + ((idx * 25) % 120);
-
-      if (window._mapCanvasPatterns) {
-        window._mapCanvasPatterns(patternId, domeinList, patternAngle);
-      }
 
       // Collect features for active neighborhoods
       const features = [];
@@ -904,8 +968,19 @@
       });
 
       if (features.length > 0) {
-        const sourceId = `hover-highlight-src-${idx}`;
+        const sourceId = `click-highlight-src-${idx}`;
 
+        let borderColor = "#ffffff";
+        if (visualMode === "gebied") {
+          const gebiedKey = p.gebied || "default";
+          borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
+        } else if (visualMode === "koepel") {
+          const koepelKey =
+            (p.koepels || "").split(";").map((k) => k.trim())[0] || "default";
+          borderColor = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
+        }
+
+        // 1. Add neighborhood outline layer
         map.addSource(sourceId, {
           type: "geojson",
           data: {
@@ -916,36 +991,12 @@
 
         map.addLayer(
           {
-            id: sourceId,
-            type: "fill",
-            source: sourceId,
-            paint: {
-              "fill-pattern": patternId,
-              "fill-opacity": 0.7,
-            },
-          },
-          "buurten-fill",
-        );
-
-        // Add subtle definition outline matching visual mode colors
-        let borderColor = "#5d69fb";
-        if (visualMode === "gebied") {
-          const gebiedKey = p.gebied || "default";
-          borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (p.koepels || "").split(";").map((k) => k.trim())[0] || "default";
-          borderColor = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        }
-
-        map.addLayer(
-          {
             id: `${sourceId}-outline`,
             type: "line",
             source: sourceId,
             paint: {
               "line-color": borderColor,
-              "line-width": p === selectedPlace ? 3 : 1.5,
+              "line-width": 3,
             },
           },
           "buurten-fill",
@@ -977,9 +1028,9 @@
       const el = document.createElement("div");
       const isArea = place.location_type === "area";
 
-      el.className = isArea ? "air-area-blob-marker" : "air-marker";
+      el.className = isArea ? "air-area-hex-marker" : "air-marker";
 
-      let borderColor = "#737ac6";
+      let borderColor = "#ffffff";
       if (visualMode === "gebied") {
         const gebiedKey = place.gebied || "default";
         borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
@@ -990,10 +1041,10 @@
       }
 
       if (isArea) {
-        el.innerHTML = createBlobSVG(
+        el.innerHTML = createHexagonSVG(
           place.domeinen,
-          index,
-          place === selectedPlace ? "#5d69fb" : borderColor,
+          place === selectedPlace ? "#ffffff" : borderColor,
+          true, // isArea — renders at larger size & 0.75 opacity
         );
 
         const areaGebieden = (place.gebied || "")
@@ -1009,7 +1060,12 @@
           hoveredAreaGebieden = [];
         });
       } else {
-        el.innerHTML = createHexagonSVG(place.domeinen, borderColor, false);
+        el.innerHTML = createHexagonSVG(
+          place.domeinen,
+          borderColor,
+          false,
+          place === selectedPlace,
+        );
       }
 
       container.appendChild(el);
@@ -1020,7 +1076,10 @@
         activatePlaceOnMap(place);
       });
 
-      const m = new maplibregl.Marker({ element: container })
+      const m = new maplibregl.Marker({
+        element: container,
+        anchor: isArea ? "center" : "bottom",
+      })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
@@ -1072,7 +1131,7 @@
   });
 </script>
 
-<div class="layout" onclick={closePopup} role="presentation">
+<div class="layout" class:has-selected-area={selectedPlace && selectedPlace.location_type === "area"} onclick={closePopup} role="presentation">
   <div class="mobile-header">In opbouw: "Initiatiefkracht in kaart"</div>
   <aside
     class="sidebar"
@@ -2312,15 +2371,16 @@
   }
 
   :global(.air-marker) {
-    min-width: 20px;
-    height: 20px;
+    min-width: 32px;
+    height: 32px;
     cursor: pointer;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+    filter: drop-shadow(0 2px 3px rgba(50, 67, 255, 0.4));
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
     z-index: 200; /* Ensure points are above areas */
+    transform-origin: bottom;
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
       filter 0.25s ease;
@@ -2333,34 +2393,101 @@
   }
 
   :global(.air-marker.active-glow) {
-    filter: drop-shadow(0 0 8px #5d69fb);
-    transform: scale(1.2);
+    /* filter: drop-shadow(0 0 8px #5d69fb); */
+    transform: scale(1.5);
     z-index: 1002;
   }
 
-  :global(.air-area-marker) {
-    min-width: 24px;
-    height: 24px;
-  }
-
-  :global(.air-area-blob-marker) {
-    width: 80px;
-    height: 80px;
+  :global(.air-area-hex-marker) {
+    min-width: 30px;
+    height: 30px;
     cursor: pointer;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    z-index: 100; /* Areas always behind points */
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 100;
+    transition:
+      transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+      filter 0.25s ease;
+    overflow: visible;
   }
 
-  :global(.marker-container:hover .air-area-blob-marker) {
-    transform: scale(1.25);
+  :global(.air-area-hex-marker svg) {
+    overflow: visible;
   }
 
-  :global(.air-area-blob-marker.active-glow path) {
-    filter: drop-shadow(0 0 5px #5d69fb) drop-shadow(0 0 10px #5d69fb);
+  /* Rings: always visible at their base opacities, expanding on hover */
+  :global(.air-area-hex-marker .hex-ring) {
+    opacity: var(--ring-op);
+    transform-origin: center;
+    transition:
+      transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+      opacity 0.3s ease;
+  }
+
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-1) {
+    transform: scale(1.15);
+    transition-delay: 0ms;
+  }
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-2) {
+    transform: scale(1.3);
+    transition-delay: 15ms;
+  }
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-3) {
+    transform: scale(1.45);
+    transition-delay: 30ms;
+  }
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-4) {
+    transform: scale(1.6);
+    transition-delay: 45ms;
+  }
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-5) {
+    transform: scale(1.75);
+    transition-delay: 60ms;
+  }
+  :global(.marker-container:hover .air-area-hex-marker .hex-ring-6) {
+    transform: scale(1.9);
+    transition-delay: 75ms;
+  }
+
+  /* Rings when clicked/active: even more expanded than hover! */
+  :global(.air-area-hex-marker.active-glow .hex-ring-1) {
+    transform: scale(1.3);
+    transition-delay: 0ms;
+  }
+  :global(.air-area-hex-marker.active-glow .hex-ring-2) {
+    transform: scale(1.5);
+    transition-delay: 15ms;
+  }
+  :global(.air-area-hex-marker.active-glow .hex-ring-3) {
+    transform: scale(1.7);
+    transition-delay: 30ms;
+  }
+  :global(.air-area-hex-marker.active-glow .hex-ring-4) {
+    transform: scale(1.9);
+    transition-delay: 45ms;
+  }
+  :global(.air-area-hex-marker.active-glow .hex-ring-5) {
+    transform: scale(2.1);
+    transition-delay: 60ms;
+  }
+  :global(.air-area-hex-marker.active-glow .hex-ring-6) {
+    transform: scale(2.3);
+    transition-delay: 75ms;
+  }
+
+  :global(.marker-container:hover .air-area-hex-marker) {
+    transform: scale(1.35);
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+    z-index: 500;
+  }
+
+  :global(.air-area-hex-marker.active-glow) {
+    /* filter: drop-shadow(0 0 10px #5d69fb); */
+    transform: scale(1.5);
+    z-index: 1002;
   }
 
   .logos-section {
@@ -2643,5 +2770,18 @@
 
   .initiatives-intro .cta strong {
     color: #5d69fb;
+  }
+
+  :global(.layout.has-selected-area .air-marker),
+  :global(.layout.has-selected-area .air-area-hex-marker) {
+    opacity: 0.25;
+    transition: opacity 0.3s ease, filter 0.3s ease;
+  }
+
+  :global(.layout.has-selected-area .air-marker.active-glow),
+  :global(.layout.has-selected-area .air-area-hex-marker.active-glow),
+  :global(.layout.has-selected-area .marker-container:hover .air-marker),
+  :global(.layout.has-selected-area .marker-container:hover .air-area-hex-marker) {
+    opacity: 1;
   }
 </style>
