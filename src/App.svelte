@@ -15,6 +15,10 @@
   let currentOpacities = new Map();
   let opacityAnimationFrame = null;
 
+  // Hover blob overlay state
+  let hoveredBlobOverlay = $state(null); // { pathD, colors, patternId, patternAngle, w, h }
+  let mapMoveHandler = null;
+
   let selectedPlace = $state(null);
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
@@ -245,7 +249,7 @@
     }
 
     const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1" />`;
+    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" />`;
 
     const opacity = isArea ? 0.75 : 1;
 
@@ -852,12 +856,127 @@
     clickedAreaGebieden = [];
   }
 
+  // ── Hover blob overlay helpers ────────────────────────────────────────────
+
+  /**
+   * Given an array of {x,y} screen points, build a smooth closed Catmull-Rom
+   * spline path. `tension` controls how "tight" the curve is (0 = straight).
+   */
+  function catmullRomClosedPath(pts, tension = 0.3) {
+    if (pts.length < 3) return "";
+    const n = pts.length;
+    let d = "";
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n];
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % n];
+      const p3 = pts[(i + 2) % n];
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+      if (i === 0) d += `M ${p1.x} ${p1.y} `;
+      d += `C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y} `;
+    }
+    return d + "Z";
+  }
+
+  /**
+   * Subsample a polygon ring to at most `maxPts` evenly-spaced vertices so the
+   * blob doesn't get too jaggy from high-detail buurten polygons.
+   */
+  function subsampleRing(ring, maxPts = 32) {
+    if (ring.length <= maxPts) return ring;
+    const step = ring.length / maxPts;
+    const out = [];
+    for (let i = 0; i < maxPts; i++) {
+      out.push(ring[Math.round(i * step) % ring.length]);
+    }
+    return out;
+  }
+
+  /** Collect the outer rings of all GeoJSON features that match the given buurtnamen. */
+  function collectRings(gebieden) {
+    const rings = [];
+    gebieden.forEach((gebied) => {
+      const ids = buurtToFeatureIds.get(gebied) || [];
+      ids.forEach((id) => {
+        const feat = allGeoFeatures[id];
+        if (!feat) return;
+        const geom = feat.geometry;
+        if (!geom) return;
+        const polys =
+          geom.type === "Polygon"
+            ? [geom.coordinates]
+            : geom.type === "MultiPolygon"
+              ? geom.coordinates
+              : [];
+        polys.forEach((poly) => {
+          if (poly[0]) rings.push(poly[0]); // outer ring only
+        });
+      });
+    });
+    return rings;
+  }
+
+  /** Project a GeoJSON ring ([lng,lat][] ) to screen pixels via map.project(). */
+  function projectRing(ring) {
+    return ring.map(([lng, lat]) => {
+      const pt = map.project([lng, lat]);
+      return { x: pt.x, y: pt.y };
+    });
+  }
+
+  /** Build (or refresh) the hovered blob overlay for a given place. */
+  function buildHoverOverlay(place, idx) {
+    if (!map || !mapContainer) return;
+
+    const gebieden = (place.gebied || "")
+      .split(";")
+      .map((g) => g.trim())
+      .filter(Boolean);
+
+    const rings = collectRings(gebieden);
+    if (rings.length === 0) return;
+
+    const domeinList = [
+      ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
+    ].filter(Boolean);
+    const colors = domeinList.map(
+      (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
+    );
+    if (colors.length === 0) colors.push(DOMEIN_COLORS.default);
+
+    const patternAngle = 30 + ((idx * 25) % 120);
+    const patternId = `hov-pat-${idx}`;
+
+    // Project all rings and build combined path
+    const w = mapContainer.offsetWidth;
+    const h = mapContainer.offsetHeight;
+
+    let fullPath = "";
+    rings.forEach((ring) => {
+      const screenPts = projectRing(ring);
+      const sampled = subsampleRing(screenPts, 28);
+      fullPath += catmullRomClosedPath(sampled, 0.25) + " ";
+    });
+
+    hoveredBlobOverlay = {
+      pathD: fullPath.trim(),
+      colors,
+      patternId,
+      patternAngle,
+      w,
+      h,
+    };
+  }
+
   let currentHighlightLayers = [];
 
   $effect(() => {
     if (!mapLoaded || !map) return;
 
-    // Clean up older highlight layers/sources
+    // Clean up older highlight layers/sources (only for selectedPlace / clicked area)
     currentHighlightLayers.forEach((id) => {
       if (map.getLayer(id)) map.removeLayer(id);
       if (map.getLayer(`${id}-outline`)) map.removeLayer(`${id}-outline`);
@@ -866,32 +985,24 @@
     currentHighlightLayers = [];
 
     const areas = filteredPlaces.filter((p) => p.location_type === "area");
-    const hoveredSet = new Set(hoveredAreaGebieden);
     const clickedSet = new Set(clickedAreaGebieden);
 
+    // Only render MapLibre layers for the *selected* (clicked) place
     areas.forEach((p, idx) => {
-      if (p !== hoveredPlace && p !== selectedPlace) return;
+      if (p !== selectedPlace) return;
 
       const gebieden = p.gebied.split(";").map((g) => g.trim());
-
-      // Check if this area matches any hovered or clicked neighborhood
-      const activeGebieden = gebieden.filter(
-        (g) => hoveredSet.has(g) || clickedSet.has(g),
-      );
+      const activeGebieden = gebieden.filter((g) => clickedSet.has(g));
       if (activeGebieden.length === 0) return;
 
       const domeinList = [
         ...new Set((p.domeinen || "").split(";").map((d) => d.trim())),
       ].filter(Boolean);
+      const primaryFillColor =
+        domeinList.length > 0
+          ? DOMEIN_COLORS[domeinList[0]] || DOMEIN_COLORS.default
+          : DOMEIN_COLORS.default;
 
-      const patternId = `map-canvas-pattern-${idx}-${domeinList.join("-")}`;
-      const patternAngle = 30 + ((idx * 25) % 120);
-
-      if (window._mapCanvasPatterns) {
-        window._mapCanvasPatterns(patternId, domeinList, patternAngle);
-      }
-
-      // Collect features for active neighborhoods
       const features = [];
       activeGebieden.forEach((gebied) => {
         const ids = buurtToFeatureIds.get(gebied) || [];
@@ -908,10 +1019,7 @@
 
         map.addSource(sourceId, {
           type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: features,
-          },
+          data: { type: "FeatureCollection", features },
         });
 
         map.addLayer(
@@ -920,23 +1028,12 @@
             type: "fill",
             source: sourceId,
             paint: {
-              "fill-pattern": patternId,
-              "fill-opacity": 0.7,
+              "fill-color": primaryFillColor,
+              "fill-opacity": 0.5,
             },
           },
           "buurten-fill",
         );
-
-        // Add subtle definition outline matching visual mode colors
-        let borderColor = "#5d69fb";
-        if (visualMode === "gebied") {
-          const gebiedKey = p.gebied || "default";
-          borderColor = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (p.koepels || "").split(";").map((k) => k.trim())[0] || "default";
-          borderColor = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        }
 
         map.addLayer(
           {
@@ -944,8 +1041,9 @@
             type: "line",
             source: sourceId,
             paint: {
-              "line-color": borderColor,
-              "line-width": p === selectedPlace ? 3 : 1.5,
+              "line-color": primaryFillColor,
+              "line-width": 2.5,
+              "line-opacity": 0.85,
             },
           },
           "buurten-fill",
@@ -962,6 +1060,35 @@
         if (map.getSource(id)) map.removeSource(id);
       });
       currentHighlightLayers = [];
+    };
+  });
+
+  // Rebuild hover overlay whenever hoveredPlace or map view changes
+  $effect(() => {
+    // Remove previous map move listener
+    if (mapMoveHandler && map) {
+      map.off("move", mapMoveHandler);
+      mapMoveHandler = null;
+    }
+
+    if (!hoveredPlace || !mapLoaded || !map) {
+      hoveredBlobOverlay = null;
+      return;
+    }
+
+    const idx = filteredPlaces.indexOf(hoveredPlace);
+    buildHoverOverlay(hoveredPlace, idx);
+
+    // Keep overlay in sync while panning/zooming
+    mapMoveHandler = () => buildHoverOverlay(hoveredPlace, idx);
+    map.on("move", mapMoveHandler);
+
+    return () => {
+      if (mapMoveHandler && map) {
+        map.off("move", mapMoveHandler);
+        mapMoveHandler = null;
+      }
+      hoveredBlobOverlay = null;
     };
   });
 
@@ -1561,6 +1688,40 @@
         </div>
       </div>
     {/if}
+
+    {#if hoveredBlobOverlay}
+      {@const ov = hoveredBlobOverlay}
+      <svg
+        class="hover-blob-overlay"
+        width={ov.w}
+        height={ov.h}
+        viewBox="0 0 {ov.w} {ov.h}"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <defs>
+          <pattern
+            id={ov.patternId}
+            width={ov.colors.length * 3}
+            height="100"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate({ov.patternAngle})"
+          >
+            {#each ov.colors as color, ci}
+              <rect x={ci * 3} y="0" width="1.5" height="100" fill={color} />
+            {/each}
+          </pattern>
+        </defs>
+        <path
+          d={ov.pathD}
+          fill="url(#{ov.patternId})"
+          stroke={ov.colors[0]}
+          stroke-width="2"
+          stroke-opacity="0.7"
+          opacity="0.82"
+        />
+      </svg>
+    {/if}
   </div>
 </div>
 
@@ -2157,6 +2318,24 @@
     position: relative;
   }
 
+  .hover-blob-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 150;
+    animation: blobOverlayFadeIn 0.22s ease-out both;
+  }
+
+  @keyframes blobOverlayFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   .fixed-air-popup {
     position: absolute;
     top: 12px;
@@ -2357,10 +2536,6 @@
 
   :global(.marker-container:hover .air-area-blob-marker) {
     transform: scale(1.25);
-  }
-
-  :global(.air-area-blob-marker.active-glow path) {
-    filter: drop-shadow(0 0 5px #5d69fb) drop-shadow(0 0 10px #5d69fb);
   }
 
   .logos-section {
