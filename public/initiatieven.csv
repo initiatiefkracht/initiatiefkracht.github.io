@@ -28,7 +28,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 28;Stichting Kledingbank Rotterdam;51.9045016189665;4.45350899801389;Delfshaven;Circulair;https://www.kledingbank-rotterdam.nl/;;plek;point
 29;Kinderatelier Punt 5;51.9104195491864;4.44828581213952;Delfshaven;"Cultuur; Circulair";https://www.kinderatelierpunt5.nl/;;plek;point
 30;Het BuurtAtelier;51.9124434217841;4.46083083973667;Middelland;"Cultuur; Circulair";https://hetbuurtatelier.nl/;;plek;point
-31;Essenburgpark;51.9221846294489;4.44795801572829;Middelland;Groen;https://essenburgpark.nl;"De Groene Connectie; Groen010";plek;point
+31;Essenburgpark;51.92268597531151;4.449601889969293;Middelland;Groen;https://essenburgpark.nl;"De Groene Connectie; Groen010";plek;point
 32;Wijkpaleis;51.91510821613315;4.459756408300091;Middelland;"Cultuur; Welzijn";https://www.wijkpaleis.nl/;Welzijnscoalitie Delfshaven;plek;point
 33;Stichting Pluspunt;51.913494178945;4.44808496486402;Nieuwe Westen;"Circulair; Welzijn";https://www.pluspuntrotterdam.info/;Rotterdam Circulair;plek;point
 34;Stichting Gezana;51.9176890464227;4.45212373532596;Nieuwe Westen;Welzijn;https://www.stichtinggezana.nl/;;plek;point
@@ -72,7 +72,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 74;Studio Delfshaven;51.908543228133;4.44677754455495;"Delfshaven; Witte Dorp; Oud Mathenesse; Spangen; Midelland; Nieuwe Westen; Bospolder; Schiemond; Tussendijken";Cultuur;https://www.wijkconnect.com/rotterdam/organisaties/8895/studio-delfshaven?usergroup_id=8895&usergroup=studio-delfshaven;;plek;area
 75;Wijkplatform Delfshaven Zuid;51.9120909247306;4.43965367511351;"Bospolder; Tussendijken";"Welzijn; Wonen";https://www.wijkconnect.com/rotterdam/delfshaven/organisaties/391/wijkplatform-delfshaven-zuid;Welzijnscoalitie Delfshaven;plek;area
 76;Wijk in Bloei;51.9185677670065;4.42268397491063;Oud Mathenesse;"Groen; Klimaat";https://mathenesseaandemaas.nl/wijk-in-bloei/;"Groen010; Rotterdams Weerwoord";plek;area
-77;Huize Middelland;51.915101744194;4.45980143516936;Middelland;"Welzijn; Cultuur";https://huizemiddelland.nl/;Welzijnscoalitie Delfshaven;plek;area
+77;Huize Middelland;51.914329089006024;4.459718635839105;Middelland;"Welzijn; Cultuur";https://huizemiddelland.nl/;Welzijnscoalitie Delfshaven;plek;area
 78;Thuis in West;51.914847093425;4.45822636200672;Middelland;"Welzijn; Wonen";https://www.thuisinwest.nl/;;plek;point
 79;De Stadstuinier;51.9098773400336;4.45402576485783;Nieuwe Westen;"Groen; Voedsel; Klimaat";https://destadstuinier.nl/;Groen010;plek;area
 80;Groep Goed Wonen;51.9136323610541;4.4505777464723;Nieuwe Westen;"Wonen; Welzijn";https://www.rotterdam-010.nl/bewonersvereniging-groep-goed-wonen-3023hg/;;plek;area
@@ -112,10 +112,10 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 118;Minivoedselbos Rotterdam Central District;51.925458;4.474973;Cs Kwartier;Groen;;;plek;point
 119;DakAkker;51.92545452;4.476733908;Cs Kwartier;Groen;www.dakakker.nl;;plek;point
 120;Landje van Geluk;51.9100593;4.464058609;Dijkzigt;Groen;;;plek;point
-121;Coolhavenpark / Tuschinskipark - actieve bewoners;51.90975;4.460833333;Dijkzigt;Groen;https://www.stichtingtuschinskirotterdam.nl/over-de-stichting;;plek;point
-122;Kleine Avonturenpark - het;51.90816667;4.460972222;Dijkzigt;Groen;http://hetkleineavonturenpark.blogspot.nl/;;plek;point
-123;Wijktuin Oude Westen (in het Wijkpark);51.91880556;4.470666667;Oude Westen;Groen;https://www.facebook.com/komengeniet/;;plek;point
-124;Dierenhofje (in Wijkpark Oude Westen);51.918421;4.471003;Oude Westen;Groen;https://aktiegroepoudewesten.nl/aanvraagformulier-wow-initiatief/wijkpark/;;plek;point
+121;Coolhavenpark;51.90975;4.460833333;Dijkzigt;Groen;https://www.stichtingtuschinskirotterdam.nl/over-de-stichting;;plek;point
+122;Het Kleine Avonturenpark;51.90816667;4.460972222;Dijkzigt;Groen;http://hetkleineavonturenpark.blogspot.nl/;;plek;point
+123;Wijktuin Oude Westen;51.91880556;4.470666667;Oude Westen;Groen;https://www.facebook.com/komengeniet/;;plek;point
+124;Dierenhofje;51.918421;4.471003;Oude Westen;Groen;https://aktiegroepoudewesten.nl/aanvraagformulier-wow-initiatief/wijkpark/;;plek;point
 125;Aktiegroep het Oude Westen;51.9195;4.468305556;Oude Westen;Groen;http://aktiegroepoudewesten.nl/groepen/wijkpark/;;plek;point
 126;Herenplaats / OMI Binnenterrein;51.9165;4.465555556;Oude Westen;Groen;https://www.herenplaats.nl/;;plek;point
 127;Habitat tuin;51.91422222;4.479861111;Stadsdriehoek;Groen;https://www.cooperatiestek.nl/project/educatieve-buurttuin/;;plek;point
@@ -127,12 +127,12 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 133;Katendrechtse Lagedijkplein;51.890595;4.478642;Carnisse;Groen;;;plek;point
 134;Amelandseplein zelfbeheer;51.888188;4.483843;Carnisse;Groen;https://www.ad.nl/rotterdam/plantenbieb-op-het-amelandseplein-mag-toch-blijven~a819a5d3/?referrer=https%3A%2F%2Fwww.google.com%2F;;plek;point
 135;Groene Oase op Zuid;51.885505;4.481273;Carnisse;Groen;https://www.degroeneoaseopzuid.nl/;;plek;point
-136;Otje (O-tje) Stichting Het (tuin van);51.88597222;4.462083333;Charlois;Groen;https://hetotje.nl/;;plek;point
-137;Verborgen Geheim - Binnentuinvereniging het;51.89181291;4.419027467;Heijplaat;Groen;https://www.facebook.com/binnentuinhvg/;;plek;point
+136;'t O-tje;51.88597222;4.462083333;Charlois;Groen;https://hetotje.nl/;;plek;point
+137;Binnentuinvereniging Het Verborgen Geheim;51.89181291;4.419027467;Heijplaat;Groen;https://www.facebook.com/binnentuinhvg/;;plek;point
 138;Charloisse Kerktuin;51.89280556;4.466444444;Oud Charlois;Groen;"""www.oudekerkcharlois.nl";;plek;point
 139;Ontmoetingstuin (ook: Hassan Jatimtuin);51.893717;4.466023;Oud Charlois;Groen;https://fb.watch/ofFVKyhxoj/ en https://www.facebook.com/Ontmoetingstuin;;plek;point
-140;Boergoense Vliet (Charlois aan de Vliet);51.88691667;4.465805556;Oud Charlois;Groen;3082 KX;;plek;point
-141;BAD (B.A.D.) Stichting;51.88641667;4.467;Oud Charlois;Groen;https://www.foundationbad.nl/;;plek;point
+140;Stichting Charlois aan de Vliet;51.88691667;4.465805556;Oud Charlois;Groen;3082 KX;;plek;point
+141;Foundation B.a.d.;51.88641667;4.467;Oud Charlois;Groen;https://www.foundationbad.nl/;;plek;point
 142;Hugohofje;51.887;4.469916667;Oud Charlois;Groen;https://www.facebook.com/Hugohofje/;;plek;point
 143;Arboretum Pendrecht;51.86983333;4.470083333;Pendrecht;Groen;https://www.facebook.com/ArboretumPendrecht/   en  http://www.vitaalpendrecht.nl/;;plek;point
 144;Cultuurwerkplaats Tarwewijk - Binnentuin;51.89488889;4.49325;Tarwewijk;Groen;https://www.facebook.com/cultuurwerkplaatstarwewijk en https://vakmanstad.nl/vakmanstad-op-de-akker/;;plek;point
@@ -149,11 +149,10 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 156;Pluktuin Lange Dijkstraat;51.906456;4.451512;Delfshaven;Groen;;;plek;point
 157;Schat van Schoonderloo;51.90613889;4.453055556;Delfshaven;Groen;http://www.schatvanschoonderloo.nl/;;plek;point
 158;Tuin op de Pier;51.90136111;4.459833333;Schiemond;Groen;www.tuinopdepier.nl;;plek;point
-159;Spoortuin - De;51.92302778;4.456833333;Middelland;Groen;www.instagram.com/spoortuin/  –  https://huizemiddelland.nl/locaties/de-spoortuin;;plek;point
+159;De Spoortuin;51.92302778;4.456833333;Middelland;Groen;www.instagram.com/spoortuin/  –  https://huizemiddelland.nl/locaties/de-spoortuin;;plek;point
 160;Graaf Florisstraat: Regentuinen;51.91952778;4.457472222;Middelland;Groen;www.graafflorisstraat.nl;;plek;point
 161;Graaf Florisstraat (vereniging ter bevordering);51.91933333;4.457472222;Middelland;Groen;www.graafflorisstraat.nl;;plek;point
-162;"Paleistuin Wijkpaleis 
-";51.91508333;4.460388889;Middelland;Groen;https://www.wijkpaleis.nl/;;plek;point
+162;"Paleistuin Wijkpaleis";51.91508333;4.460388889;Middelland;Groen;https://www.wijkpaleis.nl/;;plek;point
 163;Het Dierenlandje;51.91938889;4.461527778;Middelland;Groen;www.facebook.com/Dierenlandje;;plek;point
 164;Palet;51.91122222;4.458388889;Middelland;Groen;www.madeby.works;;plek;point
 165;Dorpsplein Marconistraat;51.913139;4.421158;Nieuw Mathenesse;Groen;https://overmathenesse.nl/correspondent/dorpsplein-marconistraat;;plek;point
@@ -182,22 +181,22 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 193;Hefpark;51.91227778;4.500777778;Feijenoord;Groen;www.hefpark.nl;;plek;point
 194;Stampioen Dwarsstraten;51.91211111;4.504388889;Feijenoord;Groen;3071 TN;;plek;point
 195;FijnOord Buurtmoestuin;51.89830556;4.5145;Hillesluis;Groen;https://www.facebook.com/profile.php?id=100006816977821;;plek;point
-196;Driehoek (De) (coll. Binnentuin);51.90055556;4.483194444;Katendrecht;Groen;http://platformbinnentuinen.nl/tuinen/;;plek;point
-197;Tuin van Katendrecht - De;51.900492;4.480309;Katendrecht;Groen;https://www.dehavenloods.nl/nieuws/algemeen/53918/een-liefdesverklaring-aan-de-tuin-van-katendrecht;;plek;point
-198;Laankwartier II (coll. Binnentuin);51.93713889;4.583722222;Katendrecht;Groen;http://platformbinnentuinen.nl/tuinen/laankwartier-ii/;;plek;point
+196;De Driehoek - Collectieve Binnentuin;51.90055556;4.483194444;Katendrecht;Groen;http://platformbinnentuinen.nl/tuinen/;;plek;point
+197;De Tuin van Katendrecht;51.900492;4.480309;Katendrecht;Groen;https://www.dehavenloods.nl/nieuws/algemeen/53918/een-liefdesverklaring-aan-de-tuin-van-katendrecht;;plek;point
+198;Laankwartier II Collectieve Binnentuin;51.93713889;4.583722222;Katendrecht;Groen;http://platformbinnentuinen.nl/tuinen/laankwartier-ii/;;plek;point
 199;Locomotieftuin;51.90475;4.50675;Kop van Zuid;Groen;https://www.facebook.com/locomotief.tuin.3/;;plek;point
 200;Natuurtuin - Villa Zebra;51.911447;4.497172;Kop van Zuid;Groen;https://www.villazebra.nl/;;plek;point
 201;De Overtuin;51.90108333;4.508694444;Kop van Zuid;Groen;https://overmaas-wonen.nl/al-gebouwd/overtuin/;;plek;point
 202;Halfrondplantsoen;51.911222;4.498847;Kop van Zuid;Groen;;;plek;point
 203;Oranjeboomtuin;51.90816667;4.506805556;Kop van Zuid;Groen;http://www.transformism.org/posts/view/1;;plek;point
-204; The Orange Tree Garden;51.909798;4.504745;Kop van Zuid;Groen;https://www.cbkrotterdam.nl/en/agenda/the-orange-tree-garden-in-time-2021/;;plek;point
+204;The Orange Tree Garden;51.909798;4.504745;Kop van Zuid;Groen;https://www.cbkrotterdam.nl/en/agenda/the-orange-tree-garden-in-time-2021/;;plek;point
 205;Rotterdamse Munt;51.90855556;4.505805556;Kop van Zuid;Groen;www.rotterdamsemunt.nl;;plek;point
 206;Hof aan de Hef;51.914;4.496166667;Noordereiland;Groen;;;plek;point
 207;De Tuinen van Tante Nino;51.91418319;4.496820419;Noordereiland;Groen;https://www.tantenino.org/about;;plek;point
 208;Ons Park;51.91486111;4.49725;Noordereiland;Groen;https://rotterdamseparken.nl/site/parken/ons-park/;;plek;point
 209;Oeverloos;51.88086111;4.550416667;Feijeroord;Groen;https://tussentuin.nl/tuinen/oeverloos;;plek;point
 210;Witte Paard Eetbare tuin;51.88553;4.51161;Vreewijk;Groen;www.hetwittepaardrotterdam.nl;;plek;point
-211;Tuinen Keurings Commissie Vreewijk - stichting;51.88542;4.51161;Vreewijk;Groen;https://www.facebook.com/groups/831639797396172/ en https://www.rijnmond.nl/nieuws/1849109/tuinkeuring-vreewijk-stopt-na-100-jaar-zelfs-in-de-oorlog-ging-het-door;;plek;point
+211;Tuinen Keurings Commissie Vreewijk;51.88542;4.51161;Vreewijk;Groen;https://www.facebook.com/groups/831639797396172/ en https://www.rijnmond.nl/nieuws/1849109/tuinkeuring-vreewijk-stopt-na-100-jaar-zelfs-in-de-oorlog-ging-het-door;;plek;point
 212;Drrroomland Buurt- en Nutstuinencomplex;51.96061111;4.514472222;Hilligersberg Noord;Groen;http://drrroomland.nl;;plek;point
 213;CSA Tuinderij de Stadsboerin;51.968383;4.470014;Schiebroek;Groen;https://stadsboerinrotterdam.nl/;;plek;point
 214;Natuurtalent (Talentfabriek010);51.96838889;4.471;Schiebroek;Groen;https://www.facebook.com/natuurtalent010;;plek;point
@@ -205,21 +204,21 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 216;Gedenkbos Schiebroekse Park;51.96839126;4.467937209;Schiebroek;Groen;3053 JV;;plek;point
 217;Tuimeltuin;51.96916667;4.474333333;Schiebroek;Groen;http://www.vtvlusthof.nl/component/tags/tag/6-kantine;;plek;point
 218;Landje aan de Rotte;51.94455556;4.486888889;Terbregge;Groen;https://www.facebook.com/landjeaanderotte;;plek;point
-219;Buurttuin Beverwaard ook Tropische tuin;51.89401741;4.572315143;Beverwaard;Groen;;;plek;point
+219;Buurttuin Beverwaard;51.89401741;4.572315143;Beverwaard;Groen;;;plek;point
 220;Kasteeltuinen Beverwaard;51.897128;4.570886;Beverwaard;Groen;https://nl-nl.facebook.com/KasteeltuinenBeverwaard/;;plek;point
 221;Energiehuistuin;51.882215;4.54145;Hordijkerveld;Groen;https://duurzaam010.nl/events/tuindag-bij-het-energiehuis/  of zie https://duurzaam010.nl/thema/energiehuis/;;plek;point
-222;Tuin van de wijk Lombardijen;51.87340201;4.529173769;Lombardijen;Groen;groengoedrotterdam.com;;plek;point
+222;Tuin van de Wijk Lombardijen;51.87340201;4.529173769;Lombardijen;Groen;groengoedrotterdam.com;;plek;point
 223;Buitenplaats Brienenoord;51.89977778;4.535222222;Oud-IJsselmonde;Groen;https://www.buitenplaatsbrienenoord.nl/;;plek;point
 224;Boomgaard de Groenx;51.87858333;4.563055556;Reyeroord;Groen;;;plek;point
 225;Pelgrimskerk;51.88286111;4.54925;Reyeroord;Groen;https://www.kerkinijsselmonde.nl/pelgrimskerk/;;plek;point
-226;Esch - wijktuin de;51.91411111;4.52225;De Esch;Groen;http://www.deeschdwl.nl/wijktuin-de-esch/;;plek;point
+226;Wijktuin de Esch;51.91411111;4.52225;De Esch;Groen;http://www.deeschdwl.nl/wijktuin-de-esch/;;plek;point
 227;Groenwaarde - stichting / Bloemenweide;51.909528;4.522789;de Esch;Groen;https://www.buurtcollectiefdeesch.nl/groenwaarde/;;plek;point
 228;Edible EUr;51.91619444;4.526611111;Kralingen Oost;Groen;https://www.eshub.nl/edible-eur/?fbclid=IwAR2TaVLcB-x11WWjrUUv-u_maO1ap4owFzgWCBVzowtamv8RwbY41bXe3tg;;plek;point
 229;Lambertuskerktuin;51.920514;4.513628;Kralingen Oost;Groen;https://www.lambertuskerk-rotterdam.nl/kerktuin.html;;plek;point
 230;Voedselbos Kralingen;51.927412;4.505414;Kralingen West;Groen;http://www.voedselboskralingen.nl/;;plek;point
-231;Smoes Buurtmoestuin ('s Moes);51.927375;4.504337;Kralingen West;Groen;https://www.zelfdoeninzh.nl/vrijwilligerswerk-doen/stadstuinierenstadslandbouwvoedselbos/buurtmoestuin-s-moes-rotterdam/;;plek;point
+231;'s Moes Buurtmoestuin;51.927375;4.504337;Kralingen West;Groen;https://www.zelfdoeninzh.nl/vrijwilligerswerk-doen/stadstuinierenstadslandbouwvoedselbos/buurtmoestuin-s-moes-rotterdam/;;plek;point
 232;Heemtuin Kralingse Bos;51.94202778;4.514555556;Kralingen West;Groen;https://www.hetkralingsebos.nl/blog/de-heemtuin;;plek;point
-233;Tuin van Tante Stien ;51.93183333;4.487944444;Oud Crooswijk;Groen;http://doornroos.je/tuinen/tuin-van-tante-stien/  en http://platformbinnentuinen.nl/tuinen/tuin-van-tante-stien/;;plek;point
+233;Tuin van Tante Stien;51.93183333;4.487944444;Oud Crooswijk;Groen;http://doornroos.je/tuinen/tuin-van-tante-stien/  en http://platformbinnentuinen.nl/tuinen/tuin-van-tante-stien/;;plek;point
 234;Drijvende tuin Buizengat;51.91869629;4.513716427;Struisenburg;Groen;https://rdamsenieuwe.nl/nieuws/de-wereld-veranderen-met-drijvende-eilanden/  zie ook https://tijdschriftdetuin.nl/drijvende-eilanden-in-rotterdam/;;plek;point
 235;Klimaatplein Maasboulevard;51.91891667;4.507333333;Struisenburg;Groen;Eric van Ulden vanuit STEK de stadstuinwinkel  ;;plek;point
 236;Dakgaard;51.92680556;4.479083333;Agniesebuurt;Groen;https://rotterdamseparken.nl/site/parken/station-hofplein-dakgaard/  of https://rotterdamsmilieucentrum.nl/2017/02/08/groen-op-het-spoor-dakgaard-op-een-treinstation/;;plek;point
@@ -233,20 +232,20 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 244;VTV de Schout ;51.9305;4.472416667;Agniessebuurt;Groen;;;plek;point
 245;Oogst Met Mij Mee Tuin;51.93119444;4.473277778;Bergpolder;Groen;https://www.noorderzon010.nl/bewonersinitiatieven-rotterdam-noord/groente-verbouwen-bij-oogst-met-mij-mee/;;plek;point
 246;Vredestuin Noord;51.939235;4.466955;Bergpolder;Groen;www.groengoedrotterdam.com;;plek;point
-247;Bloembinderij Geschikt (coll. Binnentuin);51.9335;4.463666667;Bergpolder;Groen;http://platformbinnentuinen.nl/tuinen/bloembinderij-geschikt/;;plek;point
+247;Bloembinderij Geschikt - Collectieve Binnentuin;51.9335;4.463666667;Bergpolder;Groen;http://platformbinnentuinen.nl/tuinen/bloembinderij-geschikt/;;plek;point
 248;Groene T van Noord;51.936988;4.467032;Bergpolder;Groen;https://degroenet.nl/;;plek;point
-249;Savornin Lohmanlaan - Tuiniergroep de;51.93619444;4.467055556;Bergpolder;Groen;https://www.facebook.com/TuiniergroepDeSavorninLohmanlaan/;;plek;point
-250;Pluspunt Buurttuin (Noord beheer parkje);51.93361111;4.460694444;Blijdorp;Groen;www.pluspuntrotterdam.info;;plek;point
+249;De Tuiniergroep - Savornin Lohmanlaan;51.93619444;4.467055556;Bergpolder;Groen;https://www.facebook.com/TuiniergroepDeSavorninLohmanlaan/;;plek;point
+250;Pluspunt Buurttuin;51.93361111;4.460694444;Blijdorp;Groen;www.pluspuntrotterdam.info;;plek;point
 251;Waelheul - collectieve binnentuin;51.93066667;4.46825;Blijdorp;Groen;http://platformbinnentuinen.nl/tuinen/waelheul/;;plek;point
 252;Gordelwegtuinen;51.93511111;4.456027778;Blijdorp;Groen;http://gordelwegtuinen.nl/;;plek;point
 253;Schepenstraat zelfbeheer;51.92747222;4.463277778;Blijdorp;Groen;https://schepenstraat.info/;;plek;point
-254;Eendracht - Binnenhof woongebouw de;51.93269444;4.454944444;Blijdorp;Groen;https://rijksmonumenten.nl/monument/524318/woningcomplex-de-eendracht/rotterdam/;;plek;point
+254;de Eendracht - Binnenhof Woongebouw;51.93269444;4.454944444;Blijdorp;Groen;https://rijksmonumenten.nl/monument/524318/woningcomplex-de-eendracht/rotterdam/;;plek;point
 256;Eeuwige Moes;51.92894444;4.456305556;Blijdorp;Groen;https://www.facebook.com/Eeuwige-Moes-Rotterdam-106228127615947/;;plek;point
 257;Daltonveld;51.93136111;4.448861111;Blijdorpse Polder;Groen;https://blijdorpnieuws.nl/het-daltonveld/;;plek;point
 258;Muizengaatje;51.94136111;4.4795;Liskwartier;Groen;www.studionatuurinclusief.nl/het-muizengaatje/;;plek;point
 259;Voedselbos Ackersdijkstraat;51.938315;4.471839;Liskwartier;Groen;https://explorer.land/p/project/rotterdam-food-forest/site/BBY5BF/about;;plek;point
 260;Pluktuin Liskwartier;51.93913889;4.474361111;Liskwartier;Groen;https://www.facebook.com/#!/pages/Pluktuin-Liskwartier/140698322773626?fref=ts;;plek;point
-261;Bergwegplantsoen - buurttuin;51.93877778;4.477611111;"Liskwartier; Oude Noorden";Groen;www.groengoedrotterdam.com;;plek;point
+261;Bergwegplantsoen - Buurttuin;51.93877778;4.477611111;"Liskwartier; Oude Noorden";Groen;www.groengoedrotterdam.com;;plek;point
 262;Tuin van de Koning;51.93663889;4.474527778;Liswartier;Groen;https://www.detuinvandekoning.nl/;;plek;point
 263;Hofdijk Binnentuin ;51.92825;4.483277778;Oude Noorden;Groen;https://www.facebook.com/BinnentuinHofdijk  http://www.platformbinnentuinen.nl/tuinen/binnentuin-hofdijk/;;plek;point
 264;Heliport stadstuin;51.92672222;4.482083333;Oude Noorden;Groen;https://www.watersensitiverotterdam.nl/verhalen/anonieme-plek-naar-groene-stadstuin/;;plek;point
@@ -254,7 +253,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 266;Tuin van Noord;51.93241667;4.477583333;Oude Noorden;Groen;http://www.tuinvannoord.nl/;;plek;point
 267;FonTUIN;51.93930556;4.479694444;Oude Noorden;Groen;https://www.facebook.com/deFontuin?fref=ts;;plek;point
 268;Ruivenstraat Voedselbos;51.938375;4.483777;Oude Noorden;Groen;https://explorer.land/p/project/rotterdam-food-forest/site/IAVkGV/about;;plek;point
-269;Wolpark (Wolstraat);51.93430556;4.4875;Oude Noorden;Groen;https://www.havensteder.nl/Nieuws/2531/havensteder-en-maas-wijkontwikkeling-zetten-handtekening-onder-ontwikkelplan-32-noord;;plek;point
+269;Wolpark;51.93430556;4.4875;Oude Noorden;Groen;https://www.havensteder.nl/Nieuws/2531/havensteder-en-maas-wijkontwikkeling-zetten-handtekening-onder-ontwikkelplan-32-noord;;plek;point
 270;De Blokkentuin;51.93569444;4.485944444;Oude Noorden;Groen;https://www.region-lab.nl/?portfolio=blokkentuin;;plek;point
 271;Hooglandstraat Droomstraat;51.93786111;4.480861111;Oude Noorden;Groen;https://www.vantienenarchitectuur.nl/portfolio/droomstraat-vrijstraat-hoogland-rotterdam/;;plek;point
 272;Louwerslootplein zelfbeheer;51.93688889;4.481416667;Oude Noorden;Groen;;;plek;point
@@ -268,10 +267,10 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 280;Heultuin;51.929939;4.469868;Provenierswijk;Groen;https://www.facebook.com/media/set/?vanity=noord010inbeeld&set=a.936725415125273;;plek;point
 281;Ungertuin;51.92925;4.471694444;Provenierswijk;Groen;;;plek;point
 282;Buurttuin Zuster Hennekenplein;51.926752;4.473989;Provenierswijk;Groen;;;plek;point
-283;Kleinpolder Pleinpark - stichting werkgemeenschap;51.93088889;4.438805556;Kleinpolder;Groen;https://kleinpolderpleinpark.nl/;;plek;point
+283;Kleinpolder Pleinpark - Stichting Werkgemeenschap;51.93088889;4.438805556;Kleinpolder;Groen;https://kleinpolderpleinpark.nl/;;plek;point
 284;Kleinpolderpark;51.931342;4.438661;Kleinpolder;Groen;http://kleinpolderpleinpark.nl/#stichting;;plek;point
 285;Klein Poldertje - Natuurspeeltuin;51.935872;4.431946;Kleinpolder;Groen;https://m.facebook.com/Gebied.Overschie/posts/1971686066245140;;plek;point
-286;Sleutelring schoffelploeg;51.9328975;4.428786043;Kleinpolder;Groen;https://www.instagram.com/p/C8OjTfEoAyf/;;plek;point
+286;Sleutelring Schoffelploeg;51.9328975;4.428786043;Kleinpolder;Groen;https://www.instagram.com/p/C8OjTfEoAyf/;;plek;point
 287;Verstegen Voedselbos;51.924632;4.423737;Kleinpolder;Groen;https://verstegen.nl/nieuws/verstegen-plant-een-voedselbos-in-de-spaanse-polder-in-rotterdam/;;plek;point
 288;Stichting de Achtertuin;51.94483333;4.428777778;Landzicht;Groen;https://www.wijkconnect.com/rotterdam/overschie/organisaties/2332/stichting-de-achtertuin;;plek;point
 289;Veerhuiseiland;51.94186111;4.41775;Overschie;Groen;;;plek;point
@@ -281,8 +280,8 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 293;Harry's Moestuin;51.9675;4.422444444;Schieveen;Groen;;;plek;point
 294;Bike Park Rotterdam;51.93722222;4.451972222;Zestienhoven;Groen;https://bikeparkrotterdam.nl/;;plek;point
 295;Lage Land Voedselbos;51.942452;4.551029;Het Lage Land;Groen;https://ko-fi.com/lageland;;plek;point
-296;Grasbuurtparkje Ommoord - Grasbuurt Meetup;51.956;4.546777778;Ommoord;Groen;https://www.youtube.com/channel/UCoaIV8zkkICwbSmzeH7f3Ag/videos en https://www.grasbuurtrotterdam.nl/2020/08/23/einde-bewonersiniatieven-grasbuurt-door-aanleg-brom-fietspad/;;plek;point
-297;Ommoord - Wijktuin;51.96302778;4.538277778;Ommoord;Groen;https://boo.nl/wijktuin.html  en https://nl.wikipedia.org/wiki/Wijktuin_Ommoord  en https://www.facebook.com/pages/Wijktuin%20Ommoord/1418385248401334/about/?ref;;plek;point
+296;Grasbuurtparkje Ommoord;51.956;4.546777778;Ommoord;Groen;https://www.youtube.com/channel/UCoaIV8zkkICwbSmzeH7f3Ag/videos en https://www.grasbuurtrotterdam.nl/2020/08/23/einde-bewonersiniatieven-grasbuurt-door-aanleg-brom-fietspad/;;plek;point
+297;Wijktuin Ommoord;51.96302778;4.538277778;Ommoord;Groen;https://boo.nl/wijktuin.html  en https://nl.wikipedia.org/wiki/Wijktuin_Ommoord  en https://www.facebook.com/pages/Wijktuin%20Ommoord/1418385248401334/about/?ref;;plek;point
 298;Moestuinmeiden Heidebuurt;51.970106;4.545751;Ommoord;Groen;https://prinsalexander.info/nieuws/rotterdam/prinsalexander/index.php/2024/06/26/nieuwe-moestuinen-in-prins-alexander/;;plek;point
 299;Ommoordse Veld;51.96716667;4.542055556;Ommoord;Groen;http://www.ommoordseveld.blogspot.nl/;;plek;point
 300;Söderblomplaats Snoeptuin;51.96402778;4.541194444;Ommoord;Groen;http://wdbn.nl/projecten zie ook https://www.facebook.com/OmmoordNieuws/photos/wild-fruit-plukken-aan-de-s%C3%B6derblomplaats-in-het-najaar-van-2013-werd-in-ommoord/621856364639741/;;plek;point
