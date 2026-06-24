@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "name": "SatelliteOnly",
+  "name": "SatelliteVivid",
   "metadata": {},
   "sources": {
     "esri-satellite": {
@@ -20,7 +20,7 @@
         "visibility": "visible"
       },
       "paint": {
-        "background-color": "#000000",
+        "background-color": "#111111",
         "background-opacity": 1
       }
     },
@@ -29,10 +29,10 @@
       "type": "raster",
       "source": "esri-satellite",
       "paint": {
-        "raster-saturation": -1,
-        "raster-contrast": -0.2,
         "raster-brightness-min": 0.5,
-        "raster-brightness-max": 1
+        "raster-brightness-max": 1,
+        "raster-contrast": -0.2,
+        "raster-saturation": 0.3
       }
     }
   ]
