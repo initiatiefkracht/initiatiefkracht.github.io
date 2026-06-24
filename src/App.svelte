@@ -163,16 +163,20 @@
   const createPureCircleSVG = (
     domeinen,
     size = 48,
-    borderColor = "#333333",
+    borderColor = "#000000",
   ) => {
     const domeinList = [
       ...new Set((domeinen || "").split(";").map((d) => d.trim())),
     ].filter(Boolean);
     const N = domeinList.length;
     const colors = [];
+    const names = [];
 
     if (N === 0) {
-      for (let i = 0; i < 6; i++) colors.push(DOMEIN_COLORS.default);
+      for (let i = 0; i < 6; i++) {
+        colors.push(DOMEIN_COLORS.default);
+        names.push("default");
+      }
     } else {
       const perDomain = Math.floor(6 / N);
       const remainder = 6 % N;
@@ -182,6 +186,7 @@
         const color = DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
         for (let j = 0; j < count; j++) {
           colors.push(color);
+          names.push(d);
         }
       });
     }
@@ -208,11 +213,11 @@
     for (let i = 0; i < 6; i++) {
       const p1 = points[i];
       const p2 = points[(i + 1) % 6];
-      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+      trianglesHtml += `<path class="hex-triangle" data-domain="${names[i]}" d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[i]}</title></path>`;
     }
 
     const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" />`;
+    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" />`;
 
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
       ${trianglesHtml}
@@ -228,26 +233,26 @@
   ) => {
     if (isArea) {
       const size = 30;
-      const R = 10;
+      const R = 6;
       const cx = size / 2;
       const cy = size / 2;
 
       // Transparent backing circle to capture mouse hover events and prevent flickering
       const hoverTargetHtml = `<circle cx="${cx}" cy="${cy}" r="30" fill="rgba(0,0,0,0)" pointer-events="all" />`;
 
-      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="10" fill="#99a5ff" ${isSelected ? 'stroke="#ffffff" stroke-width="1"' : ""} />`;
+      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#5d69fb" ${isSelected ? 'stroke="#ffffff" stroke-width="1"' : ""} />`;
 
       const rings = [
-        { r: 12, maxOp: 0.75, sw: 5.0 },
-        { r: 15.25, maxOp: 0.55, sw: 3.5 },
-        { r: 18, maxOp: 0.4, sw: 3.0 },
-        { r: 20.25, maxOp: 0.25, sw: 2.5 },
-        { r: 22.25, maxOp: 0.15, sw: 2.0 },
-        { r: 23.75, maxOp: 0.1, sw: 1.5 },
+        { r: 8, maxOp: 0.8, sw: 3.5 },
+        { r: 11, maxOp: 0.8, sw: 2.5 },
+        { r: 14, maxOp: 0.8, sw: 1.5 },
+        { r: 17, maxOp: 0.8, sw: 1 },
+        { r: 20, maxOp: 0.8, sw: 0.5 },
+        { r: 23, maxOp: 0.8, sw: 0.25 },
       ];
       let ringsHtml = "";
       rings.forEach(({ r, maxOp, sw }, ri) => {
-        ringsHtml += `<circle class="hex-ring hex-ring-${ri + 1}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${borderColor}" stroke-width="${sw}" style="--ring-op:${maxOp};" />`;
+        ringsHtml += `<circle class="hex-ring hex-ring-${ri + 1}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ffffff" stroke-width="${sw}" style="--ring-op:${maxOp};" />`;
       });
 
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:1.0;overflow:visible;">
@@ -352,6 +357,12 @@
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
   let clickedAreaGebieden = $state([]);
+  let activeHoveredDomein = $state(null);
+
+  $effect(() => {
+    selectedPlace;
+    activeHoveredDomein = null;
+  });
 
   let locationFilterMode = $state("all");
   let searchQuery = $state("");
@@ -1442,11 +1453,6 @@
             class="popup-title-group"
             style="display: flex; align-items: center; gap: 12px; flex-grow: 1; min-width: 0;"
           >
-            <div
-              style="flex-shrink: 0; background: #ffffff; border-radius: 4px; padding: 3px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
-            >
-              {@html createPureCircleSVG(selectedPlace.domeinen, 26, "#ffffff")}
-            </div>
             <h3 class="popup-title">{selectedPlace.name}</h3>
           </div>
           <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
@@ -1471,18 +1477,54 @@
 
           <div class="popup-info-row domains-row">
             <span class="label">Domeinen</span>
-            <div class="popup-tags">
-              {#each [...new Set((selectedPlace.domeinen || "")
-                    .split(";")
-                    .map((d) => d.trim()))] as d}
-                <span
-                  class="p-tag"
-                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                    DOMEIN_COLORS.default}"
-                >
-                  {d.trim()}
-                </span>
-              {/each}
+            <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+            <div
+              class="domains-layout-container"
+              class:has-hovered-domain={activeHoveredDomein !== null}
+              style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
+            >
+              <!-- Hexagon Container -->
+              <div
+                style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
+                class="hexagon-container"
+                data-hovered-domain={activeHoveredDomein}
+                onmouseover={(e) => {
+                  const target = e.target.closest(".hex-triangle");
+                  if (target) {
+                    activeHoveredDomein = target.getAttribute("data-domain");
+                  }
+                }}
+                onmouseout={() => {
+                  activeHoveredDomein = null;
+                }}
+              >
+                {@html createPureCircleSVG(
+                  selectedPlace.domeinen,
+                  72,
+                  "#ffffff",
+                )}
+              </div>
+
+              <!-- Domain Tags List -->
+              <div
+                class="popup-tags"
+                style="display: flex; flex-direction: column; gap: 6px;"
+              >
+                {#each [...new Set((selectedPlace.domeinen || "")
+                      .split(";")
+                      .map((d) => d.trim()))] as d}
+                  <span
+                    class="p-tag domain-name-tag"
+                    class:light-up={activeHoveredDomein === d}
+                    style="background-color: {DOMEIN_COLORS[d.trim()] ||
+                      DOMEIN_COLORS.default}"
+                    onmouseenter={() => (activeHoveredDomein = d)}
+                    onmouseleave={() => (activeHoveredDomein = null)}
+                  >
+                    {d.trim()}
+                  </span>
+                {/each}
+              </div>
             </div>
           </div>
 
@@ -2299,7 +2341,7 @@
     min-width: 30px;
     height: 30px;
     cursor: pointer;
-    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
+
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2682,5 +2724,93 @@
   :global(.layout.has-selected-area .marker-container:hover .air-marker),
   :global(.layout.has-selected-area .marker-container:hover .air-area-marker) {
     opacity: 1;
+  }
+
+  :global(.hex-triangle) {
+    transition:
+      transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+      filter 0.25s ease,
+      opacity 0.25s ease;
+    transform-origin: center;
+    cursor: pointer;
+  }
+  :global(.hex-triangle:hover) {
+    transform: scale(1.15);
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+    opacity: 0.95;
+    z-index: 10;
+    stroke-width: 1.5;
+  }
+
+  /* Two-way linkage: trigger SVG wedge highlight when domain tag on right is hovered */
+  :global(
+      .hexagon-container[data-hovered-domain="Wonen"]
+        .hex-triangle[data-domain="Wonen"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Welzijn"]
+        .hex-triangle[data-domain="Welzijn"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Cultuur"]
+        .hex-triangle[data-domain="Cultuur"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Klimaat"]
+        .hex-triangle[data-domain="Klimaat"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Voedsel"]
+        .hex-triangle[data-domain="Voedsel"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Groen"]
+        .hex-triangle[data-domain="Groen"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Circulair"]
+        .hex-triangle[data-domain="Circulair"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Mobiliteit"]
+        .hex-triangle[data-domain="Mobiliteit"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="Energie"]
+        .hex-triangle[data-domain="Energie"]
+    ),
+  :global(
+      .hexagon-container[data-hovered-domain="default"]
+        .hex-triangle[data-domain="default"]
+    ) {
+    transform: scale(1.15);
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+    opacity: 0.95;
+    z-index: 10;
+    stroke-width: 1.5;
+  }
+
+  :global(.hexagon-container) {
+    display: inline-block;
+  }
+
+  :global(.p-tag.domain-name-tag) {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: left center;
+    cursor: pointer;
+  }
+
+  /* Dim all domain tags by default when one is hovered */
+  :global(.domains-layout-container.has-hovered-domain .domain-name-tag) {
+    opacity: 0.45;
+  }
+
+  /* Keep hovered domain tag fully visible, scaled and bright */
+  :global(
+      .domains-layout-container.has-hovered-domain .domain-name-tag.light-up
+    ) {
+    opacity: 1;
+    transform: scale(1.08);
+    filter: brightness(1.15) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
   }
 </style>
