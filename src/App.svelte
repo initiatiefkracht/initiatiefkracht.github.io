@@ -160,11 +160,7 @@
    * @param {number} [size]
    * @param {string} [borderColor]
    */
-  const createPureCircleSVG = (
-    domeinen,
-    size = 48,
-    borderColor = "#000000",
-  ) => {
+  const createHexagonSVG = (domeinen, size = 48, borderColor = "#000000") => {
     const domeinList = [
       ...new Set((domeinen || "").split(";").map((d) => d.trim())),
     ].filter(Boolean);
@@ -225,7 +221,7 @@
     </svg>`;
   };
 
-  const createCircleSVG = (
+  const createMarkerSVG = (
     domeinen,
     borderColor,
     isArea,
@@ -240,7 +236,7 @@
       // Transparent backing circle to capture mouse hover events and prevent flickering
       const hoverTargetHtml = `<circle cx="${cx}" cy="${cy}" r="30" fill="rgba(0,0,0,0)" pointer-events="all" />`;
 
-      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#5d69fb" ${isSelected ? 'stroke="#ffffff" stroke-width="1"' : ""} />`;
+      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#5d69fb60" ${isSelected ? 'stroke="#ffffff" stroke-width="1"' : ""} />`;
 
       const rings = [
         { r: 8, maxOp: 0.8, sw: 3.5 },
@@ -402,14 +398,10 @@
         highlightedSearchIndex >= 0 &&
         highlightedSearchIndex < searchSuggestions.length
       ) {
-        selectPlaceOnMap(searchSuggestions[highlightedSearchIndex]);
+        activatePlaceOnMap(searchSuggestions[highlightedSearchIndex]);
         searchQuery = "";
       }
     }
-  }
-
-  function selectPlaceOnMap(place) {
-    activatePlaceOnMap(place);
   }
 
   function activatePlaceOnMap(place) {
@@ -802,7 +794,6 @@
     selectedPlace = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
-    hoveredPlace = null;
     clickedAreaGebieden = [];
   }
 
@@ -932,27 +923,14 @@
       }
 
       if (isArea) {
-        el.innerHTML = createCircleSVG(
+        el.innerHTML = createMarkerSVG(
           place.domeinen,
           borderColor,
           true,
           place === selectedPlace,
         );
-
-        const areaGebieden = (place.gebied || "")
-          .split(";")
-          .map((g) => g.trim());
-        el.addEventListener("mouseenter", () => {
-          hoveredPlace = place;
-          hoveredAreaGebieden = areaGebieden.filter(Boolean);
-        });
-
-        el.addEventListener("mouseleave", () => {
-          hoveredPlace = null;
-          hoveredAreaGebieden = [];
-        });
       } else {
-        el.innerHTML = createCircleSVG(
+        el.innerHTML = createMarkerSVG(
           place.domeinen,
           borderColor,
           false,
@@ -1076,7 +1054,7 @@
                 <button
                   class="search-suggestion"
                   class:highlighted={i === highlightedSearchIndex}
-                  onclick={() => selectPlaceOnMap(suggestion)}
+                  onclick={() => activatePlaceOnMap(suggestion)}
                   type="button"
                 >
                   {suggestion.name}
@@ -1498,11 +1476,7 @@
                   activeHoveredDomein = null;
                 }}
               >
-                {@html createPureCircleSVG(
-                  selectedPlace.domeinen,
-                  72,
-                  "#ffffff",
-                )}
+                {@html createHexagonSVG(selectedPlace.domeinen, 72, "#ffffff")}
               </div>
 
               <!-- Domain Tags List -->
