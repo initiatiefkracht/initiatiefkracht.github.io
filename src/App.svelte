@@ -906,354 +906,489 @@
 </script>
 
 <div class="layout" onclick={closePopup} role="presentation">
-  <div class="mobile-header">In opbouw: "Initiatiefkracht in kaart"</div>
-  <aside
-    class="sidebar"
-    class:open={mobileSidebarOpen}
-    onclick={(e) => e.stopPropagation()}
-    ontouchstart={(e) => e.stopPropagation()}
-    ontouchmove={(e) => e.stopPropagation()}
-    ontouchend={(e) => e.stopPropagation()}
-    onpointerdown={(e) => e.stopPropagation()}
-    onpointermove={(e) => e.stopPropagation()}
-    onpointerup={(e) => e.stopPropagation()}
-    onwheel={(e) => e.stopPropagation()}
-    role="presentation"
-  >
-    <button
-      class="mobile-toggle"
-      onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
-    >
-      <div class="toggle-content">
-        <i class="ph {mobileSidebarOpen ? 'ph-caret-down' : 'ph-caret-up'}"></i>
-        <span class="menu-text">menu</span>
-      </div>
-    </button>
-    <div class="brand">
-      IN OPBOUW: <br />
-      Initiatiefkracht in kaart
+  <!-- Top Header Bar -->
+  <header class="top-header">
+    <div class="header-content">
+      <h1 class="top-title">IN OPBOUW: Initiatiefkracht in kaart</h1>
     </div>
+  </header>
 
-    <div class="sidebar-inner">
-      <div class="search-group">
-        <input
-          type="search"
-          class="search-input"
-          placeholder="Zoek op initiatiefnaam"
-          bind:value={searchQuery}
-          onkeydown={handleSearchKeyDown}
-          onfocus={() => (searchFocused = true)}
-          onblur={() => setTimeout(() => (searchFocused = false), 200)}
-        />
-        {#if searchFocused && searchSuggestions.length > 0}
-          <ul class="search-suggestions">
-            {#each searchSuggestions as suggestion, i}
-              <li>
-                <button
-                  class="search-suggestion"
-                  class:highlighted={i === highlightedSearchIndex}
-                  onclick={() => selectPlaceOnMap(suggestion)}
-                  type="button"
-                >
-                  {suggestion.name}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
+  <!-- Centered Map Frame (90% width) -->
+  <main class="map-frame">
+    <aside
+      class="sidebar"
+      class:open={mobileSidebarOpen}
+      onclick={(e) => e.stopPropagation()}
+      ontouchstart={(e) => e.stopPropagation()}
+      ontouchmove={(e) => e.stopPropagation()}
+      ontouchend={(e) => e.stopPropagation()}
+      onpointerdown={(e) => e.stopPropagation()}
+      onpointermove={(e) => e.stopPropagation()}
+      onpointerup={(e) => e.stopPropagation()}
+      onwheel={(e) => e.stopPropagation()}
+      role="presentation"
+    >
+      <button
+        class="mobile-toggle"
+        onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+      >
+        <div class="toggle-content">
+          <i class="ph {mobileSidebarOpen ? 'ph-caret-down' : 'ph-caret-up'}"
+          ></i>
+          <span class="menu-text">menu</span>
+        </div>
+      </button>
 
-      <div class="accordion">
-        <button class="accordion-header" onclick={() => toggleSection("info")}>
-          <span>Informatie</span>
-          <span class="icon">{openSections.info ? "−" : "+"}</span>
-        </button>
-        {#if openSections.info}
-          <div class="accordion-content">
-            <section class="initiatives-intro">
-              <div class="intro-section">
-                <strong>Waarom deze kaart?</strong>
-                <p>
-                  Overal in Rotterdam ontstaan er nieuwe initiatieven waarin
-                  mensen en gemeenschappen, vaak onder de radar, experimenteren
-                  met alternatieven voor de toekomst. Op het gebied van
-                  circulariteit, energie, mobiliteit, natuur, voedsel, werken en
-                  wonen ontstaan praktijken die niet wachten op beleid, maar
-                  handelen vanuit maatschappelijke noodzaak en
-                  verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden
-                  door een gedeelde zoektocht.
-                </p>
-              </div>
+      <div class="sidebar-inner">
+        <!-- Search Input -->
+        <div class="search-group">
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Zoek op initiatiefnaam"
+            bind:value={searchQuery}
+            onkeydown={handleSearchKeyDown}
+            onfocus={() => (searchFocused = true)}
+            onblur={() => setTimeout(() => (searchFocused = false), 200)}
+          />
+          {#if searchFocused && searchSuggestions.length > 0}
+            <ul class="search-suggestions">
+              {#each searchSuggestions as suggestion, i}
+                <li>
+                  <button
+                    class="search-suggestion"
+                    class:highlighted={i === highlightedSearchIndex}
+                    onclick={() => selectPlaceOnMap(suggestion)}
+                    type="button"
+                  >
+                    {suggestion.name}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
 
-              <div class="intro-section">
-                <strong>Over deze kaart</strong>
-                <p>
-                  Op deze kaart vind je een verzameling van initiatieven in
-                  Rotterdam, verdeeld over verschillende categorieën en
-                  domeinen. De kaart is niet volledig, maar geeft een eerste
-                  indruk van de diversiteit aan initiatieven in de stad. Veel
-                  initiatieven laten zich niet eenvoudig in één domein plaatsen.
-                  Ze ontstaan vaak vanuit een behoefte of urgentie in een wijk
-                  of gemeenschap, en werken daardoor juist integraal en
-                  domeinoverstijgend. Toch hebben we gekozen voor een
-                  categorisering om de veelzijdigheid van initiatiefkracht beter
-                  leesbaar en navigeerbaar te maken. Zo hopen we dat
-                  initiatieven, organisaties en bewoners elkaar makkelijker
-                  kunnen vinden, versterken en ondersteunen. <br /> <br />Hier
-                  onder vind je een uitleg van de categorieën en domeinen die we
-                  gebruiken om de initiatieven te ordenen.
-                </p>
-              </div>
-
-              <div class="category-list">
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-point"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Plekken</strong>
-                    <p>
-                      Initiatieven met een vaste, fysieke locatie in de stad.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-area"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Wijken & Netwerken</strong>
-                    <p>
-                      Wijken: initiatieven die zich richten op een specifieke
-                      wijk of buurt. <br />
-                      Netwerken: initiatieven die verschillende partijen bij elkaar
-                      brengen, en actief zijn in een bepaald gebied.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-koepel"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Koepels</strong>
-                    <p>
-                      Overkoepelende organisaties die meerdere initiatieven
-                      onder zich hebben en verbinden.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="domein-icon ph ph-house"
-                    style="color: {DOMEIN_COLORS['Wonen']}"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Domeinen</strong>
-                    <p>
-                      De initiatieven zijn onderverdeeld in domeinen. Sommige
-                      initiatieven vallen onder meerdere domeinen.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="waardebloem-section">
-                <p class="cta">
-                  <strong>Klik op de Waardenbloem</strong>
-                  en bekijk hoe de domeinen en categorieën zich tot elkaar verhouden.
-                </p>
-                <button
-                  class="waardebloem-icon-btn"
-                  onclick={() => (enlargedImage = "Waardebloem.png")}
-                  title="Klik om de Waardebloem te vergroten"
-                >
-                  <img src="Waardebloem.png" alt="Waardebloem" />
-                </button>
-              </div>
-              <div class="accordion-divider"></div>
-              <div class="intro-section">
-                <p>
-                  Deze kaart is ontwikkeld door AIR, in samenwerking met
-                  Groen010.
-                </p>
-                <div class="logos-section">
-                  <img src="AIR.png" alt="AIR logo" class="org-logo" />
-                  <img
-                    src="VG010_logo.png"
-                    alt="Groen010 logo"
-                    class="org-logo"
+        <!-- Accordions (Filters) -->
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("domein")}
+          >
+            <span>Domein</span>
+            <span class="icon">{openSections.domein ? "−" : "+"}</span>
+          </button>
+          {#if openSections.domein}
+            <div class="accordion-content">
+              {#each uniqueDomeinen as domein}
+                <label class="filter-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedDomeinen.includes(domein)}
+                    onchange={() =>
+                      (selectedDomeinen = toggleFilter(
+                        selectedDomeinen,
+                        domein,
+                      ))}
                   />
-                </div>
-              </div>
-            </section>
-          </div>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("domein")}
-        >
-          <span>Domein</span>
-          <span class="icon">{openSections.domein ? "−" : "+"}</span>
-        </button>
-        {#if openSections.domein}
-          <div class="accordion-content">
-            {#each uniqueDomeinen as domein}
-              <label class="filter-item">
-                <input
-                  type="checkbox"
-                  checked={selectedDomeinen.includes(domein)}
-                  onchange={() =>
-                    (selectedDomeinen = toggleFilter(selectedDomeinen, domein))}
-                />
-                <span class="filter-text">{domein}</span>
-                <i
-                  class="ph {DOMEIN_ICONS[domein] ||
-                    DOMEIN_ICONS.default} sidebar-icon"
-                  style="color: {DOMEIN_COLORS[domein] ||
-                    DOMEIN_COLORS.default}"
-                ></i>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("koepel")}
-        >
-          <span>Koepels</span>
-          <span class="icon">{openSections.koepel ? "−" : "+"}</span>
-        </button>
-        {#if openSections.koepel}
-          <div class="accordion-content">
-            <div class="visual-toggle-container">
-              <span class="toggle-text">Toon kleuren per koepel</span>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={visualMode === "koepel"}
-                  onchange={() => handleVisualToggle("koepel")}
-                />
-                <span class="slider"></span>
-              </label>
+                  <span class="filter-text">{domein}</span>
+                  <i
+                    class="ph {DOMEIN_ICONS[domein] ||
+                      DOMEIN_ICONS.default} sidebar-icon"
+                    style="color: {DOMEIN_COLORS[domein] ||
+                      DOMEIN_COLORS.default}"
+                  ></i>
+                </label>
+              {/each}
             </div>
-            <hr class="separator" />
-            {#each uniqueKoepels as koepel}
+          {/if}
+        </div>
+
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("koepel")}
+          >
+            <span>Koepels</span>
+            <span class="icon">{openSections.koepel ? "−" : "+"}</span>
+          </button>
+          {#if openSections.koepel}
+            <div class="accordion-content">
+              <div class="visual-toggle-container">
+                <span class="toggle-text">Toon kleuren per koepel</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    checked={visualMode === "koepel"}
+                    onchange={() => handleVisualToggle("koepel")}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <hr class="separator" />
+              {#each uniqueKoepels as koepel}
+                <label class="filter-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedKoepels.includes(koepel)}
+                    onchange={() =>
+                      (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
+                  />
+                  <span class="filter-text">{koepel}</span>
+                  <span
+                    class="color-swatch"
+                    style="background-color: {KOEPEL_COLORS[koepel] ||
+                      KOEPEL_COLORS.default}"
+                  ></span>
+                </label>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("location")}
+          >
+            <span>Locatietype</span>
+            <span class="icon">{openSections.location ? "−" : "+"}</span>
+          </button>
+          {#if openSections.location}
+            <div class="accordion-content">
+              <div class="accordion-divider"></div>
               <label class="filter-item">
                 <input
                   type="checkbox"
-                  checked={selectedKoepels.includes(koepel)}
-                  onchange={() =>
-                    (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
+                  checked={locationFilterMode === "points"}
+                  onchange={() => (locationFilterMode = "points")}
                 />
-                <span class="filter-text">{koepel}</span>
+                <span class="legend-text">Toon alleen plekken</span>
                 <span
-                  class="color-swatch"
-                  style="background-color: {KOEPEL_COLORS[koepel] ||
-                    KOEPEL_COLORS.default}"
+                  class="legend-marker legend-marker-point"
+                  aria-hidden="true"
                 ></span>
               </label>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("location")}
-        >
-          <span>Locatietype</span>
-          <span class="icon">{openSections.location ? "−" : "+"}</span>
-        </button>
-        {#if openSections.location}
-          <div class="accordion-content">
-            <div class="accordion-divider"></div>
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "points"}
-                onchange={() => (locationFilterMode = "points")}
-              />
-              <span class="legend-text">Toon alleen plekken</span>
-              <span class="legend-marker legend-marker-point" aria-hidden="true"
-              ></span>
-            </label>
 
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "areas"}
-                onchange={() => (locationFilterMode = "areas")}
-              />
-              <span class="legend-text">Toon alleen netwerken en wijken</span>
-              <span class="legend-marker legend-marker-area" aria-hidden="true"
-              ></span>
-            </label>
+              <label class="filter-item">
+                <input
+                  type="checkbox"
+                  checked={locationFilterMode === "areas"}
+                  onchange={() => (locationFilterMode = "areas")}
+                />
+                <span class="legend-text">Toon alleen netwerken en wijken</span>
+                <span
+                  class="legend-marker legend-marker-area"
+                  aria-hidden="true"
+                ></span>
+              </label>
 
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "all"}
-                onchange={() => (locationFilterMode = "all")}
-              />
-              <span class="legend-text">Toon alle initiatieven</span>
-            </label>
-          </div>
-        {/if}
+              <label class="filter-item">
+                <input
+                  type="checkbox"
+                  checked={locationFilterMode === "all"}
+                  onchange={() => (locationFilterMode = "all")}
+                />
+                <span class="legend-text">Toon alle initiatieven</span>
+              </label>
+            </div>
+          {/if}
+        </div>
       </div>
 
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("contribute")}
-        >
-          <span>Draag bij aan de kaart</span>
-          <span class="icon">{openSections.contribute ? "−" : "+"}</span>
+      {#if isAnyFilterActive}
+        <button class="reset-button" onclick={resetFilters}>
+          <i class="ph ph-arrow-counter-clockwise"></i>
+          <span>Reset filters</span>
         </button>
-        {#if openSections.contribute}
-          <div class="accordion-content">
-            <p>
-              Heb je opmerkingen over de vermelding van jouw initiatief? Stuur
-              dan een email naar <a href="mailto:initiatiefkracht@gmail.com"
-                >initiatiefkracht@gmail.com</a
-              >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
-              initiatief
-              <a
-                href="https://forms.gle/2L41WPykgQH5QRAY7"
-                target="_blank"
-                rel="noopener noreferrer">hier</a
-              > aan!
+      {/if}
+
+      <div class="stats">
+        <strong>{filteredPlaces.length}</strong> initiatieven getoond
+      </div>
+    </aside>
+
+    <!-- Map Container -->
+    <div class="map-container" bind:this={mapContainer}>
+      {#if !isMobile && showQrBlock}
+        <div class="floating-qr-block">
+          <button
+            class="qr-close-btn"
+            onclick={() => (showQrBlock = false)}
+            aria-label="Sluiten"
+          >
+            <i class="ph ph-x"></i>
+          </button>
+          <div class="qr-content">
+            <p class="qr-info-text">
+              Op de kaart vind je slechts een kleine verzameling van de
+              initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
+              dus als je een initiatief mist, laat hem achter in de ideeënbus!
+            </p>
+
+            <div class="qr-code-wrap">
+              <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
+            </div>
+
+            <p class="qr-scan-text">
+              Scan deze qr code om de kaart te ontdekken!
             </p>
           </div>
-        {/if}
+        </div>
+      {/if}
+
+      {#if selectedPlace}
+        <div
+          class="fixed-air-popup"
+          onclick={(e) => e.stopPropagation()}
+          ontouchstart={(e) => e.stopPropagation()}
+          ontouchmove={(e) => e.stopPropagation()}
+          ontouchend={(e) => e.stopPropagation()}
+          onwheel={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <div class="popup-top-bar">
+            <h3 class="popup-title">{selectedPlace.name}</h3>
+            <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
+              >×</button
+            >
+          </div>
+
+          <div class="air-popup">
+            <div class="popup-info-row location-row">
+              <span class="label">Locatie / Gebied</span>
+              <div class="popup-tags">
+                {#each formatGebiedLabel(selectedPlace.gebied)
+                  .split(";")
+                  .map((g) => g.trim())
+                  .filter(Boolean) as buurt}
+                  <span class="p-tag buurt-tag">
+                    {buurt}
+                  </span>
+                {/each}
+              </div>
+            </div>
+
+            <div class="popup-info-row domains-row">
+              <span class="label">Domeinen</span>
+              <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+              <div
+                class="domains-layout-container"
+                class:has-hovered-domain={activeHoveredDomein !== null}
+                style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
+              >
+                <!-- Hexagon Container -->
+                <div
+                  style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
+                  class="hexagon-container"
+                  data-hovered-domain={activeHoveredDomein}
+                  onmouseover={(e) => {
+                    const target = e.target.closest(".hex-triangle");
+                    if (target) {
+                      activeHoveredDomein = target.getAttribute("data-domain");
+                    }
+                  }}
+                  onmouseout={() => {
+                    activeHoveredDomein = null;
+                  }}
+                >
+                  {@html createPureCircleSVG(
+                    selectedPlace.domeinen,
+                    72,
+                    "#ffffff",
+                  )}
+                </div>
+
+                <!-- Domain Tags List -->
+                <div
+                  class="popup-tags"
+                  style="display: flex; flex-direction: column; gap: 6px;"
+                >
+                  {#each [...new Set((selectedPlace.domeinen || "")
+                        .split(";")
+                        .map((d) => d.trim()))] as d}
+                    <span
+                      class="p-tag domain-name-tag"
+                      class:light-up={activeHoveredDomein === d}
+                      style="background-color: {DOMEIN_COLORS[d.trim()] ||
+                        DOMEIN_COLORS.default}"
+                      onmouseenter={() => (activeHoveredDomein = d)}
+                      onmouseleave={() => (activeHoveredDomein = null)}
+                    >
+                      {d.trim()}
+                    </span>
+                  {/each}
+                </div>
+              </div>
+            </div>
+
+            <div class="popup-info-row koepel-row">
+              {#if selectedPlace.koepels}
+                <span class="label">Koepel</span>
+                <div class="popup-tags">
+                  {#each selectedPlace.koepels.split(";") as koepel}
+                    {@const kName = koepel.trim()}
+                    <a
+                      href={KOEPEL_WEBSITES[kName] || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="p-tag"
+                      style="background-color: {KOEPEL_COLORS[kName] ||
+                        KOEPEL_COLORS.default}; text-decoration: none;"
+                    >
+                      {kName}
+                    </a>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+
+            <div class="popup-info-row website-row">
+              {#if selectedPlace.website}
+                <a
+                  href={selectedPlace.website}
+                  target="_blank"
+                  class="popup-link">Bezoek website ↗</a
+                >
+              {/if}
+            </div>
+          </div>
+        </div>
+      {/if}
+    </div>
+  </main>
+
+  <!-- Bottom Info Section -->
+  <section class="bottom-info-section">
+    <div class="info-column block-informatie">
+      <h2>Informatie</h2>
+
+      <div class="intro-section">
+        <strong>Waarom deze kaart?</strong>
+        <p>
+          Overal in Rotterdam ontstaan er nieuwe initiatieven waarin mensen en
+          gemeenschappen, vaak onder de radar, experimenteren met alternatieven
+          voor de toekomst. Op het gebied van circulariteit, energie,
+          mobiliteit, natuur, voedsel, werken en wonen ontstaan praktijken die
+          niet wachten op beleid, maar handelen vanuit maatschappelijke noodzaak
+          en verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden door
+          een gedeelde zoektocht.
+        </p>
+      </div>
+
+      <div class="intro-section">
+        <strong>Over deze kaart</strong>
+        <p>
+          Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
+          verdeeld over verschillende categorieën en domeinen. De kaart is niet
+          volledig, maar geeft een eerste indruk van de diversiteit aan
+          initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
+          in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
+          urgentie in een wijk of gemeenschap, en werken daardoor juist
+          integraal en domeinoverstijgend. Toch hebben we gekozen voor een
+          categorisering om de veelzijdigheid van initiatiefkracht beter
+          leesbaar en navigeerbaar te maken. Zo hopen we dat initiatieven,
+          organisaties en bewoners elkaar makkelijker kunnen vinden, versterken
+          en ondersteunen. <br /> <br />Hier onder vind je een uitleg van de
+          categorieën en domeinen die we gebruiken om de initiatieven te
+          ordenen.
+        </p>
+      </div>
+
+      <div class="category-list">
+        <div class="category-item">
+          <span class="legend-marker legend-marker-point" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Plekken</strong>
+            <p>Initiatieven met een vaste, fysieke locatie in de stad.</p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span class="legend-marker legend-marker-area" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Wijken & Netwerken</strong>
+            <p>
+              Wijken: initiatieven die zich richten op een specifieke wijk of
+              buurt. <br />
+              Netwerken: initiatieven die verschillende partijen bij elkaar brengen,
+              en actief zijn in een bepaald gebied.
+            </p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span class="legend-marker legend-marker-koepel" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Koepels</strong>
+            <p>
+              Overkoepelende organisaties die meerdere initiatieven onder zich
+              hebben en verbinden.
+            </p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span
+            class="domein-icon ph ph-house"
+            style="color: {DOMEIN_COLORS['Wonen']}"
+            aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Domeinen</strong>
+            <p>
+              De initiatieven zijn onderverdeeld in domeinen. Sommige
+              initiatieven vallen onder meerdere domeinen.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="waardebloem-section">
+        <p class="cta">
+          <strong>Klik op de Waardenbloem</strong>
+          en bekijk hoe de domeinen en categorieën zich tot elkaar verhouden.
+        </p>
+        <button
+          class="waardebloem-icon-btn"
+          onclick={() => (enlargedImage = "Waardebloem.png")}
+          title="Klik om de Waardebloem te vergroten"
+        >
+          <img src="Waardebloem.png" alt="Waardebloem" />
+        </button>
+      </div>
+
+      <div class="accordion-divider"></div>
+      <div class="intro-section partners-logos">
+        <p>Deze kaart is ontwikkeld door AIR, in samenwerking met Groen010.</p>
+        <div class="logos-section">
+          <img src="AIR.png" alt="AIR logo" class="org-logo" />
+          <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+        </div>
       </div>
     </div>
 
-    {#if isAnyFilterActive}
-      <button class="reset-button" onclick={resetFilters}>
-        <i class="ph ph-arrow-counter-clockwise"></i>
-        <span>Reset filters</span>
-      </button>
-    {/if}
-
-    <div class="stats">
-      <strong>{filteredPlaces.length}</strong> initiatieven getoond
+    <div class="info-column block-contribute">
+      <h2>Draag bij aan de kaart</h2>
+      <p>
+        Heb je opmerkingen over de vermelding van jouw initiatief? Stuur dan een
+        email naar <a href="mailto:initiatiefkracht@gmail.com"
+          >initiatiefkracht@gmail.com</a
+        >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
+        initiatief
+        <a
+          href="https://forms.gle/2L41WPykgQH5QRAY7"
+          target="_blank"
+          rel="noopener noreferrer">hier</a
+        > aan!
+      </p>
     </div>
-  </aside>
+  </section>
 
+  <!-- Image zoom modal -->
   {#if enlargedImage}
     <div
       class="image-modal"
@@ -1285,116 +1420,6 @@
       </div>
     </div>
   {/if}
-
-  <div class="map-container" bind:this={mapContainer}>
-    {#if !isMobile && showQrBlock}
-      <div class="floating-qr-block">
-        <button
-          class="qr-close-btn"
-          onclick={() => (showQrBlock = false)}
-          aria-label="Sluiten"
-        >
-          <i class="ph ph-x"></i>
-        </button>
-        <div class="qr-content">
-          <p class="qr-info-text">
-            Op de kaart vind je slechts een kleine verzameling van de
-            initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
-            dus als je een initiatief mist, laat hem achter in de ideeënbus!
-          </p>
-
-          <div class="qr-code-wrap">
-            <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
-          </div>
-
-          <p class="qr-scan-text">
-            Scan deze qr code om de kaart te ontdekken!
-          </p>
-        </div>
-      </div>
-    {/if}
-
-    {#if selectedPlace}
-      <div
-        class="fixed-air-popup"
-        onclick={(e) => e.stopPropagation()}
-        ontouchstart={(e) => e.stopPropagation()}
-        ontouchmove={(e) => e.stopPropagation()}
-        ontouchend={(e) => e.stopPropagation()}
-        onwheel={(e) => e.stopPropagation()}
-        role="presentation"
-      >
-        <div class="popup-top-bar">
-          <h3 class="popup-title">{selectedPlace.name}</h3>
-          <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
-            >×</button
-          >
-        </div>
-
-        <div class="air-popup">
-          <div class="popup-info-row location-row">
-            <span class="label">Locatie / Gebied</span>
-            <div class="popup-tags">
-              {#each formatGebiedLabel(selectedPlace.gebied)
-                .split(";")
-                .map((g) => g.trim())
-                .filter(Boolean) as buurt}
-                <span class="p-tag buurt-tag">
-                  {buurt}
-                </span>
-              {/each}
-            </div>
-          </div>
-
-          <div class="popup-info-row domains-row">
-            <span class="label">Domeinen</span>
-            <div class="popup-tags">
-              {#each [...new Set((selectedPlace.domeinen || "")
-                    .split(";")
-                    .map((d) => d.trim()))] as d}
-                <span
-                  class="p-tag"
-                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                    DOMEIN_COLORS.default}"
-                >
-                  {d.trim()}
-                </span>
-              {/each}
-            </div>
-          </div>
-
-          <div class="popup-info-row koepel-row">
-            {#if selectedPlace.koepels}
-              <span class="label">Koepel</span>
-              <div class="popup-tags">
-                {#each selectedPlace.koepels.split(";") as koepel}
-                  {@const kName = koepel.trim()}
-                  <a
-                    href={KOEPEL_WEBSITES[kName] || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="p-tag"
-                    style="background-color: {KOEPEL_COLORS[kName] ||
-                      KOEPEL_COLORS.default}; text-decoration: none;"
-                  >
-                    {kName}
-                  </a>
-                {/each}
-              </div>
-            {/if}
-          </div>
-
-          <div class="popup-info-row website-row">
-            {#if selectedPlace.website}
-              <a href={selectedPlace.website} target="_blank" class="popup-link"
-                >Bezoek website ↗</a
-              >
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/if}
-  </div>
 </div>
 
 <style>
@@ -1408,31 +1433,74 @@
   :global(body) {
     margin: 0;
     padding: 0;
-    overflow: hidden;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
+    background: #fdfcf7;
   }
 
   .layout {
     display: flex;
-    width: 100%; /* was 100vw */
-    height: 100%; /* was 100vh */
-    position: fixed;
-    top: 0;
-    left: 0;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    background: #fdfcf7;
   }
+
+  .top-header {
+    background: #ffffff;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    padding: 0 5%;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .top-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #333333;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: "Helvetica", Arial, sans-serif;
+  }
+
+  .map-frame {
+    position: relative;
+    width: 95%;
+    max-width: 1600px;
+    height: 75vh;
+    min-height: 600px;
+    margin: 30px auto;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    box-sizing: border-box;
+  }
+
   .sidebar {
-    width: 350px;
-    height: 100%;
-    background: #fbf9f9;
-    border-right: 1px solid rgba(0, 0, 0, 0.05);
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 320px;
+    height: calc(100% - 40px);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
     display: flex;
     flex-direction: column;
-    z-index: 10;
-    overflow-y: hidden;
-    scrollbar-gutter: stable;
+    z-index: 1000;
+    overflow: hidden;
     font-family: "Helvetica", Arial, sans-serif;
-    position: relative;
+    box-sizing: border-box;
   }
   .sidebar-inner {
     flex: 1;
@@ -1493,16 +1561,16 @@
     }
 
     .sidebar {
-      position: fixed;
-      top: auto;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 50dvh;
-      max-height: 50dvh;
-      border-right: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.1);
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+      position: fixed !important;
+      top: auto !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 50dvh !important;
+      max-height: 50dvh !important;
+      border-radius: 0 !important;
+      border-right: none !important;
+      border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
       z-index: 2000;
       transform: translateY(calc(50dvh - 50px));
       transition: transform 0.3s ease-in-out;
@@ -1985,9 +2053,13 @@
     border: 1px solid rgba(0, 0, 0, 0.1);
   }
   .map-container {
-    flex-grow: 1;
+    width: 100%;
     height: 100%;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    box-sizing: border-box;
   }
 
   .fixed-air-popup {
@@ -2476,5 +2548,94 @@
 
   .initiatives-intro .cta strong {
     color: #5d69fb;
+  }
+
+  .bottom-info-section {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 40px;
+    width: 90%;
+    max-width: 1400px;
+    margin: 40px auto 80px auto;
+    padding-top: 30px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    box-sizing: border-box;
+  }
+
+  .info-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    font-family: "Helvetica", Arial, sans-serif;
+    color: #444444;
+    line-height: 1.6;
+    box-sizing: border-box;
+  }
+
+  .info-column h2 {
+    margin: 0 0 10px 0;
+    font-size: 1.6rem;
+    color: #333333;
+    font-weight: 700;
+    border-bottom: 2px solid #5d69fb;
+    padding-bottom: 8px;
+    width: fit-content;
+  }
+
+  .intro-section p {
+    font-size: 0.95rem;
+    color: #555555;
+  }
+
+  .partners-logos {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: 20px;
+    margin-top: 10px;
+  }
+
+  .block-contribute p {
+    font-size: 1rem;
+    color: #555555;
+  }
+
+  .block-contribute a {
+    color: #5d69fb;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  /* Responsive styling to gracefully stack layout on tablets and mobile screens */
+  @media (max-width: 900px) {
+    .map-frame {
+      flex-direction: column;
+      height: auto;
+      min-height: auto;
+      width: 95%;
+      gap: 16px;
+      margin: 15px auto;
+    }
+
+    .sidebar {
+      width: 100% !important;
+      height: 50dvh !important;
+    }
+
+    .map-container {
+      position: relative !important;
+      width: 100% !important;
+      height: 450px !important;
+    }
+
+    .bottom-info-section {
+      grid-template-columns: 1fr;
+      width: 95%;
+      gap: 24px;
+      margin: 20px auto 40px auto;
+    }
   }
 </style>
