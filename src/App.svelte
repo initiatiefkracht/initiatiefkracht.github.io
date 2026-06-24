@@ -89,7 +89,7 @@
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
