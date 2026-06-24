@@ -1,0 +1,39 @@
+{
+  "version": 8,
+  "name": "SatelliteOnly",
+  "metadata": {},
+  "sources": {
+    "esri-satellite": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "attribution": "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "background-color": "#000000",
+        "background-opacity": 1
+      }
+    },
+    {
+      "id": "satellite-background",
+      "type": "raster",
+      "source": "esri-satellite",
+      "paint": {
+        "raster-saturation": -1,
+        "raster-contrast": -0.2,
+        "raster-brightness-min": 0.5,
+        "raster-brightness-max": 1
+      }
+    }
+  ]
+}

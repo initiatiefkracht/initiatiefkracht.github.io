@@ -12,8 +12,6 @@
   let markerMap = new Map();
   let visualMode = $state("domein");
   let allGeoFeatures = $state([]);
-  let currentOpacities = new Map();
-  let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
   let activeMarkerElement = $state(null);
@@ -85,7 +83,7 @@
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style: "map-style-minimalist.json",
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -109,59 +107,15 @@
         data: geoData,
       });
 
-      map.addLayer(
-        {
-          id: "buurten-fill",
-          type: "fill",
-          source: "rotterdam-buurten",
-          paint: {
-            "fill-color": "#5d69fb",
-            "fill-opacity": 0,
-          },
+      map.addLayer({
+        id: "buurten-fill",
+        type: "fill",
+        source: "rotterdam-buurten",
+        paint: {
+          "fill-color": "#5d69fb",
+          "fill-opacity": 0,
         },
-        "watername_ocean",
-      );
-
-      // Re-introduce canvas pattern registration for neighborhood fills matching the blobs
-      const createDynamicPattern = (id, domeinList, angleDeg) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 24;
-        canvas.height = 24;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const colors = domeinList.map(
-          (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
-        );
-        if (colors.length === 0) colors.push(DOMEIN_COLORS.default);
-
-        ctx.clearRect(0, 0, 24, 24);
-
-        ctx.save();
-        ctx.translate(12, 12);
-        ctx.rotate((angleDeg * Math.PI) / 180);
-        ctx.translate(-12, -12);
-
-        // Draw thin stripes alternating with transparent gaps matching the blob definition
-        const stripeWidth = 2;
-        const gapWidth = 4;
-        const totalW = stripeWidth + gapWidth;
-
-        for (let x = -24; x < 48; x += totalW * colors.length) {
-          colors.forEach((color, index) => {
-            ctx.fillStyle = color;
-            ctx.fillRect(x + index * totalW, -24, stripeWidth, 72);
-          });
-        }
-        ctx.restore();
-
-        const imgData = ctx.getImageData(0, 0, 24, 24);
-        if (!map.hasImage(id)) {
-          map.addImage(id, imgData);
-        }
-      };
-
-      window._mapCanvasPatterns = createDynamicPattern;
+      });
 
       mapLoaded = true;
     });
@@ -201,11 +155,15 @@
     default: "ph-map-pin",
   };
 
-  const createHexagonSVG = (
+  /**
+   * @param {string} [domeinen]
+   * @param {number} [size]
+   * @param {string} [borderColor]
+   */
+  const createPureCircleSVG = (
     domeinen,
-    borderColor,
-    isArea,
-    isSelected = false,
+    size = 48,
+    borderColor = "#333333",
   ) => {
     const domeinList = [
       ...new Set((domeinen || "").split(";").map((d) => d.trim())),
@@ -228,181 +186,91 @@
       });
     }
 
+    const cx = size / 2;
+    const cy = size / 2;
+    const R = size / 2 - 2;
+
+    const hexPoints = (radius) => {
+      const pts = [];
+      for (let i = 0; i < 6; i++) {
+        const angle_rad = (Math.PI / 180) * (60 * i - 90);
+        pts.push({
+          x: cx + radius * Math.cos(angle_rad),
+          y: cy + radius * Math.sin(angle_rad),
+        });
+      }
+      return pts;
+    };
+
+    const points = hexPoints(R);
+
+    let trianglesHtml = "";
+    for (let i = 0; i < 6; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % 6];
+      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+    }
+
+    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" />`;
+
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
+      ${trianglesHtml}
+      ${borderHtml}
+    </svg>`;
+  };
+
+  const createCircleSVG = (
+    domeinen,
+    borderColor,
+    isArea,
+    isSelected = false,
+  ) => {
     if (isArea) {
       const size = 30;
       const R = 10;
       const cx = size / 2;
       const cy = size / 2;
 
-      const hexPoints = (radius) => {
-        const pts = [];
-        for (let i = 0; i < 6; i++) {
-          const angle_rad = (Math.PI / 180) * (60 * i - 90);
-          pts.push({
-            x: cx + radius * Math.cos(angle_rad),
-            y: cy + radius * Math.sin(angle_rad),
-          });
-        }
-        return pts;
-      };
+      // Transparent backing circle to capture mouse hover events and prevent flickering
+      const hoverTargetHtml = `<circle cx="${cx}" cy="${cy}" r="30" fill="rgba(0,0,0,0)" pointer-events="all" />`;
 
-      const points = hexPoints(R);
-
-      let trianglesHtml = "";
-      for (let i = 0; i < 6; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % 6];
-        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
-      }
-
-      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" />`;
-
-      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="12" fill="#ffffff" />`;
+      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="10" fill="#99a5ff" ${isSelected ? 'stroke="#ffffff" stroke-width="1"' : ""} />`;
 
       const rings = [
-        { r: 14,    maxOp: 0.55, sw: 4.0 },
-        { r: 17.75, maxOp: 0.38, sw: 3.5 },
-        { r: 21,    maxOp: 0.24, sw: 3.0 },
-        { r: 23.75, maxOp: 0.13, sw: 2.5 },
-        { r: 26,    maxOp: 0.06, sw: 2.0 },
-        { r: 27.75, maxOp: 0.03, sw: 1.5 },
+        { r: 12, maxOp: 0.75, sw: 5.0 },
+        { r: 15.25, maxOp: 0.55, sw: 3.5 },
+        { r: 18, maxOp: 0.4, sw: 3.0 },
+        { r: 20.25, maxOp: 0.25, sw: 2.5 },
+        { r: 22.25, maxOp: 0.15, sw: 2.0 },
+        { r: 23.75, maxOp: 0.1, sw: 1.5 },
       ];
       let ringsHtml = "";
       rings.forEach(({ r, maxOp, sw }, ri) => {
         ringsHtml += `<circle class="hex-ring hex-ring-${ri + 1}" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${borderColor}" stroke-width="${sw}" style="--ring-op:${maxOp};" />`;
       });
 
-      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:0.85;overflow:visible;">
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:1.0;overflow:visible;">
+        ${hoverTargetHtml}
         ${ringsHtml}
         ${bgCircleHtml}
-        ${trianglesHtml}
-        ${borderHtml}
       </svg>`;
     } else {
-      const size = 32;
-      const cx = 16;
-      const cy = 12;
-      const R = 6.2;
+      // Point locations are simple bright purple dots
+      const size = 16;
+      const cx = size / 2;
+      const cy = size / 2;
 
-      const hexPoints = (radius) => {
-        const pts = [];
-        for (let i = 0; i < 6; i++) {
-          const angle_rad = (Math.PI / 180) * (60 * i - 90);
-          pts.push({
-            x: cx + radius * Math.cos(angle_rad),
-            y: cy + radius * Math.sin(angle_rad),
-          });
-        }
-        return pts;
-      };
-
-      const points = hexPoints(R);
-
-      let trianglesHtml = "";
-      for (let i = 0; i < 6; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % 6];
-        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
-      }
-
-      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="#777" stroke-width="0.75" />`;
-
-      const pinFill = "#ffffff";
-      let pinStroke = "#ffffff";
-
-      if (borderColor === "#ffffff") {
-        pinStroke = "#ffffff";
-      }
-
-      if (isSelected) {
-        pinStroke = "#ffffff";
-      }
-
-      const strokeWidth = isSelected ? 1 : 0.5;
-
-      const pinPath = `M 16 2 C 10.5 2 6 6.5 6 12 C 6 18.5 16 30 16 30 C 16 30 26 18.5 26 12 C 26 6.5 21.5 2 16 2 Z`;
+      const dotRadius = isSelected ? 7 : 6.5;
+      const strokeHtml = isSelected
+        ? `<circle cx="${cx}" cy="${cy}" r="6.5" fill="none" stroke="#ffffff" stroke-width="2.5" />`
+        : "";
 
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
-        <path d="${pinPath}" fill="${pinFill}" stroke="${pinStroke}" stroke-width="${strokeWidth}" />
-        <circle cx="${cx}" cy="${cy}" r="8.2" fill="#ffffff" />
-        ${trianglesHtml}
-        ${borderHtml}
+        <circle cx="${cx}" cy="${cy}" r="${dotRadius}" fill="#5d69fb" stroke="#ffffff" stroke-width="1"/>
+        ${strokeHtml}
       </svg>`;
     }
-  };
-
-  const createBlobSVG = (domeinen, index, borderColor) => {
-    const domeinList = [
-      ...new Set((domeinen || "").split(";").map((d) => d.trim())),
-    ].filter(Boolean);
-    const colors = domeinList.map(
-      (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
-    );
-    if (colors.length === 0) colors.push(DOMEIN_COLORS.default);
-
-    // Generate unique pseudo-random offsets based on index to create unique organic shapes
-    const numPoints = 8;
-    const center = 40;
-    const baseRadius = 26;
-    const points = [];
-
-    // Simple deterministic LCG pseudo-random function based on index
-    let seed = index + 1;
-    const rnd = () => {
-      seed = (seed * 1664525 + 1013904223) % 4294967296;
-      return seed / 4294967296;
-    };
-
-    for (let i = 0; i < numPoints; i++) {
-      const angle = (i * 2 * Math.PI) / numPoints;
-      // Vary radius to create a unique organic blob shape
-      const radius = baseRadius + (rnd() * 12 - 6);
-      const x = center + radius * Math.cos(angle);
-      const y = center + radius * Math.sin(angle);
-      points.push({ x, y });
-    }
-
-    // Build smooth Catmull-Rom or cubic Bezier path string around the points
-    let pathD = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 0; i < numPoints; i++) {
-      const p0 = points[(i - 1 + numPoints) % numPoints];
-      const p1 = points[i];
-      const p2 = points[(i + 1) % numPoints];
-      const p3 = points[(i + 2) % numPoints];
-
-      // Control points for smooth curves
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-      pathD += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-    }
-    pathD += " Z";
-
-    // Build the dynamic pattern for stripes inside the SVG definitions
-    const patternId = `svg-pattern-${index}-${domeinList.join("-")}`;
-    const stripeWidth = 0.5; // Thinner colored stripes
-    const gapWidth = 1; // Transparent gap width to alternate and allow visibility underneath
-    const totalPatternWidth = colors.length * (stripeWidth + gapWidth);
-    const patternAngle = 30 + ((index * 25) % 120); // Vary angles to distinguish overlapping blobs
-
-    let patternContents = "";
-    colors.forEach((color, idx) => {
-      const startX = idx * (stripeWidth + gapWidth);
-      patternContents += `<rect x="${startX}" y="0" width="${stripeWidth}" height="100" fill="${color}" />`;
-    });
-
-    return `<svg width="80" height="80" viewBox="0 0 80 80" style="display: block; overflow: visible;">
-      <defs>
-        <pattern id="${patternId}" width="${totalPatternWidth}" height="100" patternUnits="userSpaceOnUse" patternTransform="rotate(${patternAngle})">
-          ${patternContents}
-        </pattern>
-      </defs>
-      <path d="${pathD}" fill="url(#${patternId})" stroke="none" opacity="0.9" />
-    </svg>`;
   };
 
   const GEBIED_COLORS = {
@@ -484,9 +352,6 @@
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
   let clickedAreaGebieden = $state([]);
-
-  let hoveredAreaGebieden = $state([]);
-  let hoveredPlace = $state(null);
 
   let locationFilterMode = $state("all");
   let searchQuery = $state("");
@@ -939,6 +804,7 @@
     currentHighlightLayers.forEach((id) => {
       if (map.getLayer(id)) map.removeLayer(id);
       if (map.getLayer(`${id}-outline`)) map.removeLayer(`${id}-outline`);
+      if (map.getLayer(`${id}-fill`)) map.removeLayer(`${id}-fill`);
       if (map.getSource(id)) map.removeSource(id);
     });
     currentHighlightLayers = [];
@@ -996,10 +862,23 @@
             source: sourceId,
             paint: {
               "line-color": borderColor,
-              "line-width": 3,
+              "line-width": 0,
             },
           },
           "buurten-fill",
+        );
+
+        map.addLayer(
+          {
+            id: `${sourceId}-fill`,
+            type: "fill",
+            source: sourceId,
+            paint: {
+              "fill-color": "#ffffff",
+              "fill-opacity": 0.3,
+            },
+          },
+          `${sourceId}-outline`,
         );
 
         currentHighlightLayers.push(sourceId);
@@ -1010,6 +889,7 @@
       currentHighlightLayers.forEach((id) => {
         if (map.getLayer(id)) map.removeLayer(id);
         if (map.getLayer(`${id}-outline`)) map.removeLayer(`${id}-outline`);
+        if (map.getLayer(`${id}-fill`)) map.removeLayer(`${id}-fill`);
         if (map.getSource(id)) map.removeSource(id);
       });
       currentHighlightLayers = [];
@@ -1028,7 +908,7 @@
       const el = document.createElement("div");
       const isArea = place.location_type === "area";
 
-      el.className = isArea ? "air-area-hex-marker" : "air-marker";
+      el.className = isArea ? "air-area-marker" : "air-marker";
 
       let borderColor = "#ffffff";
       if (visualMode === "gebied") {
@@ -1041,10 +921,11 @@
       }
 
       if (isArea) {
-        el.innerHTML = createHexagonSVG(
+        el.innerHTML = createCircleSVG(
           place.domeinen,
-          place === selectedPlace ? "#ffffff" : borderColor,
-          true, // isArea — renders at larger size & 0.75 opacity
+          borderColor,
+          true,
+          place === selectedPlace,
         );
 
         const areaGebieden = (place.gebied || "")
@@ -1060,7 +941,7 @@
           hoveredAreaGebieden = [];
         });
       } else {
-        el.innerHTML = createHexagonSVG(
+        el.innerHTML = createCircleSVG(
           place.domeinen,
           borderColor,
           false,
@@ -1078,7 +959,7 @@
 
       const m = new maplibregl.Marker({
         element: container,
-        anchor: isArea ? "center" : "bottom",
+        anchor: "center",
       })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
@@ -1131,7 +1012,13 @@
   });
 </script>
 
-<div class="layout" class:has-selected-area={selectedPlace && selectedPlace.location_type === "area"} onclick={closePopup} role="presentation">
+<div
+  class="layout"
+  class:has-selected-area={selectedPlace &&
+    selectedPlace.location_type === "area"}
+  onclick={closePopup}
+  role="presentation"
+>
   <div class="mobile-header">In opbouw: "Initiatiefkracht in kaart"</div>
   <aside
     class="sidebar"
@@ -1551,7 +1438,17 @@
         role="presentation"
       >
         <div class="popup-top-bar">
-          <h3 class="popup-title">{selectedPlace.name}</h3>
+          <div
+            class="popup-title-group"
+            style="display: flex; align-items: center; gap: 12px; flex-grow: 1; min-width: 0;"
+          >
+            <div
+              style="flex-shrink: 0; background: #ffffff; border-radius: 4px; padding: 3px; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
+            >
+              {@html createPureCircleSVG(selectedPlace.domeinen, 26, "#ffffff")}
+            </div>
+            <h3 class="popup-title">{selectedPlace.name}</h3>
+          </div>
           <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
             >×</button
           >
@@ -2371,34 +2268,34 @@
   }
 
   :global(.air-marker) {
-    min-width: 32px;
-    height: 32px;
+    min-width: 16px;
+    height: 16px;
     cursor: pointer;
-    filter: drop-shadow(0 2px 3px rgba(50, 67, 255, 0.4));
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    z-index: 200; /* Ensure points are above areas */
-    transform-origin: bottom;
+    z-index: 20; /* Ensure points are above areas */
+    transform-origin: center;
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
       filter 0.25s ease;
   }
 
   :global(.marker-container:hover .air-marker) {
-    transform: scale(1.3);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+    transform: scale(1.4);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
     z-index: 1001;
   }
 
   :global(.air-marker.active-glow) {
-    /* filter: drop-shadow(0 0 8px #5d69fb); */
     transform: scale(1.5);
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
     z-index: 1002;
   }
 
-  :global(.air-area-hex-marker) {
+  :global(.air-area-marker) {
     min-width: 30px;
     height: 30px;
     cursor: pointer;
@@ -2407,19 +2304,19 @@
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    z-index: 100;
+    z-index: 20;
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
       filter 0.25s ease;
     overflow: visible;
   }
 
-  :global(.air-area-hex-marker svg) {
+  :global(.air-area-marker svg) {
     overflow: visible;
   }
 
   /* Rings: always visible at their base opacities, expanding on hover */
-  :global(.air-area-hex-marker .hex-ring) {
+  :global(.air-area-marker .hex-ring) {
     opacity: var(--ring-op);
     transform-origin: center;
     transition:
@@ -2427,64 +2324,64 @@
       opacity 0.3s ease;
   }
 
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-1) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-1) {
     transform: scale(1.15);
     transition-delay: 0ms;
   }
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-2) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-2) {
     transform: scale(1.3);
     transition-delay: 15ms;
   }
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-3) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-3) {
     transform: scale(1.45);
     transition-delay: 30ms;
   }
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-4) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-4) {
     transform: scale(1.6);
     transition-delay: 45ms;
   }
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-5) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-5) {
     transform: scale(1.75);
     transition-delay: 60ms;
   }
-  :global(.marker-container:hover .air-area-hex-marker .hex-ring-6) {
+  :global(.marker-container:hover .air-area-marker .hex-ring-6) {
     transform: scale(1.9);
     transition-delay: 75ms;
   }
 
   /* Rings when clicked/active: even more expanded than hover! */
-  :global(.air-area-hex-marker.active-glow .hex-ring-1) {
+  :global(.air-area-marker.active-glow .hex-ring-1) {
     transform: scale(1.3);
     transition-delay: 0ms;
   }
-  :global(.air-area-hex-marker.active-glow .hex-ring-2) {
+  :global(.air-area-marker.active-glow .hex-ring-2) {
     transform: scale(1.5);
     transition-delay: 15ms;
   }
-  :global(.air-area-hex-marker.active-glow .hex-ring-3) {
+  :global(.air-area-marker.active-glow .hex-ring-3) {
     transform: scale(1.7);
     transition-delay: 30ms;
   }
-  :global(.air-area-hex-marker.active-glow .hex-ring-4) {
+  :global(.air-area-marker.active-glow .hex-ring-4) {
     transform: scale(1.9);
     transition-delay: 45ms;
   }
-  :global(.air-area-hex-marker.active-glow .hex-ring-5) {
+  :global(.air-area-marker.active-glow .hex-ring-5) {
     transform: scale(2.1);
     transition-delay: 60ms;
   }
-  :global(.air-area-hex-marker.active-glow .hex-ring-6) {
+  :global(.air-area-marker.active-glow .hex-ring-6) {
     transform: scale(2.3);
     transition-delay: 75ms;
   }
 
-  :global(.marker-container:hover .air-area-hex-marker) {
+  :global(.marker-container:hover .air-area-marker) {
     transform: scale(1.35);
     filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
     z-index: 500;
   }
 
-  :global(.air-area-hex-marker.active-glow) {
+  :global(.air-area-marker.active-glow) {
     /* filter: drop-shadow(0 0 10px #5d69fb); */
     transform: scale(1.5);
     z-index: 1002;
@@ -2773,15 +2670,17 @@
   }
 
   :global(.layout.has-selected-area .air-marker),
-  :global(.layout.has-selected-area .air-area-hex-marker) {
-    opacity: 0.25;
-    transition: opacity 0.3s ease, filter 0.3s ease;
+  :global(.layout.has-selected-area .air-area-marker) {
+    opacity: 0.4;
+    transition:
+      opacity 0.3s ease,
+      filter 0.3s ease;
   }
 
   :global(.layout.has-selected-area .air-marker.active-glow),
-  :global(.layout.has-selected-area .air-area-hex-marker.active-glow),
+  :global(.layout.has-selected-area .air-area-marker.active-glow),
   :global(.layout.has-selected-area .marker-container:hover .air-marker),
-  :global(.layout.has-selected-area .marker-container:hover .air-area-hex-marker) {
+  :global(.layout.has-selected-area .marker-container:hover .air-area-marker) {
     opacity: 1;
   }
 </style>
