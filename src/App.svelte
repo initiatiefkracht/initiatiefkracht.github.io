@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
@@ -295,6 +295,7 @@
   }
 
   function activatePlaceOnMap(place) {
+    alert("activatePlaceOnMap called for: " + (place ? place.name : "null"));
     if (activeMarkerElement) {
       activeMarkerElement.classList.remove("active-glow");
     }
@@ -314,8 +315,8 @@
       activeMarkerContainer = null;
     }
 
-    const sidebarWidth = 350;
-    const desktopPopupWidth = 320;
+    const sidebarWidth = 280;
+    const desktopPopupWidth = 300;
 
     const padding = isMobile
       ? {
@@ -849,6 +850,7 @@
       }
 
       el.addEventListener("click", (e) => {
+        alert("Marker element click event fired for: " + place.name);
         e.stopPropagation();
         activatePlaceOnMap(place);
       });
@@ -857,7 +859,8 @@
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
-      if (place === selectedPlace) {
+      const currentSelected = untrack(() => selectedPlace);
+      if (place === currentSelected) {
         el.classList.add("active-glow");
         container.style.zIndex = "9999";
         activeMarkerElement = el;
@@ -1110,152 +1113,127 @@
 
     <!-- Map Container -->
     <div class="map-container" bind:this={mapContainer}>
-      {#if !isMobile && showQrBlock}
-        <div class="floating-qr-block">
-          <button
-            class="qr-close-btn"
-            onclick={() => (showQrBlock = false)}
-            aria-label="Sluiten"
+      {#if !isMobile && showQrBlock}{/if}
+    </div>
+
+    {#if selectedPlace}
+      <div
+        class="fixed-air-popup"
+        onclick={(e) => e.stopPropagation()}
+        ontouchstart={(e) => e.stopPropagation()}
+        ontouchmove={(e) => e.stopPropagation()}
+        ontouchend={(e) => e.stopPropagation()}
+        onwheel={(e) => e.stopPropagation()}
+        role="presentation"
+      >
+        <div class="popup-top-bar">
+          <h3 class="popup-title">{selectedPlace.name}</h3>
+          <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
+            >×</button
           >
-            <i class="ph ph-x"></i>
-          </button>
-          <div class="qr-content">
-            <p class="qr-info-text">
-              Op de kaart vind je slechts een kleine verzameling van de
-              initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
-              dus als je een initiatief mist, laat hem achter in de ideeënbus!
-            </p>
-
-            <div class="qr-code-wrap">
-              <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
-            </div>
-
-            <p class="qr-scan-text">
-              Scan deze qr code om de kaart te ontdekken!
-            </p>
-          </div>
         </div>
-      {/if}
 
-      {#if selectedPlace}
-        <div
-          class="fixed-air-popup"
-          onclick={(e) => e.stopPropagation()}
-          ontouchstart={(e) => e.stopPropagation()}
-          ontouchmove={(e) => e.stopPropagation()}
-          ontouchend={(e) => e.stopPropagation()}
-          onwheel={(e) => e.stopPropagation()}
-          role="presentation"
-        >
-          <div class="popup-top-bar">
-            <h3 class="popup-title">{selectedPlace.name}</h3>
-            <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
-              >×</button
-            >
+        <div class="air-popup">
+          <div class="popup-info-row location-row">
+            <span class="label">Locatie / Gebied</span>
+            <div class="popup-tags">
+              {#each formatGebiedLabel(selectedPlace.gebied)
+                .split(";")
+                .map((g) => g.trim())
+                .filter(Boolean) as buurt}
+                <span class="p-tag buurt-tag">
+                  {buurt}
+                </span>
+              {/each}
+            </div>
           </div>
 
-          <div class="air-popup">
-            <div class="popup-info-row location-row">
-              <span class="label">Locatie / Gebied</span>
-              <div class="popup-tags">
-                {#each formatGebiedLabel(selectedPlace.gebied)
-                  .split(";")
-                  .map((g) => g.trim())
-                  .filter(Boolean) as buurt}
-                  <span class="p-tag buurt-tag">
-                    {buurt}
+          <div class="popup-info-row domains-row">
+            <span class="label">Domeinen</span>
+            <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+            <div
+              class="domains-layout-container"
+              class:has-hovered-domain={activeHoveredDomein !== null}
+              style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
+            >
+              <!-- Hexagon Container -->
+              <div
+                style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
+                class="hexagon-container"
+                data-hovered-domain={activeHoveredDomein}
+                onmouseover={(e) => {
+                  const target = e.target.closest(".hex-triangle");
+                  if (target) {
+                    activeHoveredDomein = target.getAttribute("data-domain");
+                  }
+                }}
+                onmouseout={() => {
+                  activeHoveredDomein = null;
+                }}
+              >
+                {@html createPureCircleSVG(
+                  selectedPlace.domeinen,
+                  72,
+                  "#ffffff",
+                )}
+              </div>
+
+              <!-- Domain Tags List -->
+              <div
+                class="popup-tags"
+                style="display: flex; flex-direction: column; gap: 6px;"
+              >
+                {#each [...new Set((selectedPlace.domeinen || "")
+                      .split(";")
+                      .map((d) => d.trim()))] as d}
+                  <span
+                    class="p-tag domain-name-tag"
+                    class:light-up={activeHoveredDomein === d}
+                    style="background-color: {DOMEIN_COLORS[d.trim()] ||
+                      DOMEIN_COLORS.default}"
+                    onmouseenter={() => (activeHoveredDomein = d)}
+                    onmouseleave={() => (activeHoveredDomein = null)}
+                  >
+                    {d.trim()}
                   </span>
                 {/each}
               </div>
             </div>
+          </div>
 
-            <div class="popup-info-row domains-row">
-              <span class="label">Domeinen</span>
-              <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-              <div
-                class="domains-layout-container"
-                class:has-hovered-domain={activeHoveredDomein !== null}
-                style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
-              >
-                <!-- Hexagon Container -->
-                <div
-                  style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
-                  class="hexagon-container"
-                  data-hovered-domain={activeHoveredDomein}
-                  onmouseover={(e) => {
-                    const target = e.target.closest(".hex-triangle");
-                    if (target) {
-                      activeHoveredDomein = target.getAttribute("data-domain");
-                    }
-                  }}
-                  onmouseout={() => {
-                    activeHoveredDomein = null;
-                  }}
-                >
-                  {@html createPureCircleSVG(
-                    selectedPlace.domeinen,
-                    72,
-                    "#ffffff",
-                  )}
-                </div>
-
-                <!-- Domain Tags List -->
-                <div
-                  class="popup-tags"
-                  style="display: flex; flex-direction: column; gap: 6px;"
-                >
-                  {#each [...new Set((selectedPlace.domeinen || "")
-                        .split(";")
-                        .map((d) => d.trim()))] as d}
-                    <span
-                      class="p-tag domain-name-tag"
-                      class:light-up={activeHoveredDomein === d}
-                      style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                        DOMEIN_COLORS.default}"
-                      onmouseenter={() => (activeHoveredDomein = d)}
-                      onmouseleave={() => (activeHoveredDomein = null)}
-                    >
-                      {d.trim()}
-                    </span>
-                  {/each}
-                </div>
+          <div class="popup-info-row koepel-row">
+            {#if selectedPlace.koepels}
+              <span class="label">Koepel</span>
+              <div class="popup-tags">
+                {#each selectedPlace.koepels.split(";") as koepel}
+                  {@const kName = koepel.trim()}
+                  <a
+                    href={KOEPEL_WEBSITES[kName] || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="p-tag"
+                    style="background-color: {KOEPEL_COLORS[kName] ||
+                      KOEPEL_COLORS.default}; text-decoration: none;"
+                  >
+                    {kName}
+                  </a>
+                {/each}
               </div>
-            </div>
+            {/if}
+          </div>
 
-            <div class="popup-info-row koepel-row">
-              {#if selectedPlace.koepels}
-                <span class="label">Koepel</span>
-                <div class="popup-tags">
-                  {#each selectedPlace.koepels.split(";") as koepel}
-                    {@const kName = koepel.trim()}
-                    <a
-                      href={KOEPEL_WEBSITES[kName] || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="p-tag"
-                      style="background-color: {KOEPEL_COLORS[kName] ||
-                        KOEPEL_COLORS.default}; text-decoration: none;"
-                    >
-                      {kName}
-                    </a>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-
-            <div class="popup-info-row website-row">
-              {#if selectedPlace.website}
-                <a
-                  href={selectedPlace.website}
-                  target="_blank"
-                  class="popup-link">Bezoek website ↗</a
-                >
-              {/if}
-            </div>
+          <div class="popup-info-row website-row">
+            {#if selectedPlace.website}
+              <a
+                href={selectedPlace.website}
+                target="_blank"
+                class="popup-link">Bezoek website ↗</a
+              >
+            {/if}
           </div>
         </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
   </main>
 
   <!-- Bottom Info Section -->
@@ -1427,6 +1405,7 @@
     margin: 0 !important;
     padding: 0 !important;
     max-width: none !important;
+    width: 100%;
   }
 
   :global(html),
@@ -1436,6 +1415,7 @@
     width: 100%;
     min-height: 100%;
     background: #fdfcf7;
+    display: block !important;
   }
 
   .layout {
@@ -1443,67 +1423,64 @@
     flex-direction: column;
     width: 100%;
     min-height: 100vh;
-    background: #fdfcf7;
+    background: #ffffff;
   }
 
   .top-header {
     background: #ffffff;
-    height: 70px;
+    height: 90px;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     padding: 0 5%;
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 2000;
   }
 
   .top-title {
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #333333;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #5d69fb;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    font-family: "Helvetica", Arial, sans-serif;
+    font-family: inherit;
   }
 
   .map-frame {
     position: relative;
     width: 95%;
-    max-width: 1600px;
-    height: 75vh;
+    max-width: 1750px;
+    height: 83vh;
     min-height: 600px;
-    margin: 30px auto;
-    border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    margin: 0 auto 30px auto;
     overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     box-sizing: border-box;
   }
 
   .sidebar {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    width: 320px;
-    height: calc(100% - 40px);
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    top: 15px;
+    left: 15px;
+    width: 280px;
+    height: auto;
+    max-height: calc(100% - 30px);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     z-index: 1000;
     overflow: hidden;
-    font-family: "Helvetica", Arial, sans-serif;
+    font-family: inherit;
     box-sizing: border-box;
   }
   .sidebar-inner {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -1536,7 +1513,7 @@
       height: 60px;
       background: #fbf9f9;
       color: #5d69fb;
-      font-family: "Helvetica", Arial, sans-serif;
+      font-family: inherit;
       font-weight: 900;
       font-size: 1.4rem;
       align-items: center;
@@ -2064,24 +2041,24 @@
 
   .fixed-air-popup {
     position: absolute;
-    top: 12px;
-    right: 20px;
-
+    top: 15px;
+    right: 15px;
     bottom: auto;
-
     width: 300px;
-
-    background: #fffcf4;
-    border-radius: 6px;
+    max-height: calc(100% - 30px);
+    background: rgba(255, 252, 244, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
     box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.1),
-      5px 5px 0px rgba(132, 80, 255, 0.15);
+      0 8px 32px rgba(0, 0, 0, 0.15),
+      5px 5px 0px rgba(132, 80, 255, 0.1);
     z-index: 2000;
-
-    font-family: "Helvetica", Arial, sans-serif;
+    font-family: inherit;
     text-align: left;
     overflow-y: auto;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-sizing: border-box;
   }
   .popup-top-bar {
     display: flex;
@@ -2110,7 +2087,7 @@
     background: #ffffff;
     border: none;
     font-size: 22px;
-    font-family: Arial, sans-serif;
+    font-family: inherit;
     cursor: pointer;
     color: #5d69fb;
     width: 28px;
