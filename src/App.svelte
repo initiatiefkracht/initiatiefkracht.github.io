@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
@@ -239,6 +239,26 @@
     openSections[name] = !openSections[name];
   }
 
+  let infoSection = $state();
+  let isScrolledDown = $state(false);
+
+  function handleScroll() {
+    isScrolledDown = window.scrollY > 300;
+  }
+
+  function scrollToInfo() {
+    if (infoSection) {
+      const headerHeight = 110; // sticky top-header height + buffer
+      const rect = infoSection.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - headerHeight;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+    }
+  }
+
+  function scrollToMap() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   let selectedGebieden = $state([]);
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
@@ -314,8 +334,8 @@
       activeMarkerContainer = null;
     }
 
-    const sidebarWidth = 350;
-    const desktopPopupWidth = 320;
+    const sidebarWidth = 280;
+    const desktopPopupWidth = 300;
 
     const padding = isMobile
       ? {
@@ -857,7 +877,8 @@
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
-      if (place === selectedPlace) {
+      const currentSelected = untrack(() => selectedPlace);
+      if (place === currentSelected) {
         el.classList.add("active-glow");
         container.style.zIndex = "9999";
         activeMarkerElement = el;
@@ -905,414 +926,223 @@
   });
 </script>
 
+<svelte:window onscroll={handleScroll} />
+
 <div class="layout" onclick={closePopup} role="presentation">
-  <div class="mobile-header">In opbouw: "Initiatiefkracht in kaart"</div>
-  <aside
-    class="sidebar"
-    class:open={mobileSidebarOpen}
-    onclick={(e) => e.stopPropagation()}
-    ontouchstart={(e) => e.stopPropagation()}
-    ontouchmove={(e) => e.stopPropagation()}
-    ontouchend={(e) => e.stopPropagation()}
-    onpointerdown={(e) => e.stopPropagation()}
-    onpointermove={(e) => e.stopPropagation()}
-    onpointerup={(e) => e.stopPropagation()}
-    onwheel={(e) => e.stopPropagation()}
-    role="presentation"
-  >
-    <button
-      class="mobile-toggle"
-      onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
-    >
-      <div class="toggle-content">
-        <i class="ph {mobileSidebarOpen ? 'ph-caret-down' : 'ph-caret-up'}"></i>
-        <span class="menu-text">menu</span>
-      </div>
-    </button>
-    <div class="brand">
-      IN OPBOUW: <br />
-      Initiatiefkracht in kaart
-    </div>
-
-    <div class="sidebar-inner">
-      <div class="search-group">
-        <input
-          type="search"
-          class="search-input"
-          placeholder="Zoek op initiatiefnaam"
-          bind:value={searchQuery}
-          onkeydown={handleSearchKeyDown}
-          onfocus={() => (searchFocused = true)}
-          onblur={() => setTimeout(() => (searchFocused = false), 200)}
-        />
-        {#if searchFocused && searchSuggestions.length > 0}
-          <ul class="search-suggestions">
-            {#each searchSuggestions as suggestion, i}
-              <li>
-                <button
-                  class="search-suggestion"
-                  class:highlighted={i === highlightedSearchIndex}
-                  onclick={() => selectPlaceOnMap(suggestion)}
-                  type="button"
-                >
-                  {suggestion.name}
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button class="accordion-header" onclick={() => toggleSection("info")}>
-          <span>Informatie</span>
-          <span class="icon">{openSections.info ? "−" : "+"}</span>
-        </button>
-        {#if openSections.info}
-          <div class="accordion-content">
-            <section class="initiatives-intro">
-              <div class="intro-section">
-                <strong>Waarom deze kaart?</strong>
-                <p>
-                  Overal in Rotterdam ontstaan er nieuwe initiatieven waarin
-                  mensen en gemeenschappen, vaak onder de radar, experimenteren
-                  met alternatieven voor de toekomst. Op het gebied van
-                  circulariteit, energie, mobiliteit, natuur, voedsel, werken en
-                  wonen ontstaan praktijken die niet wachten op beleid, maar
-                  handelen vanuit maatschappelijke noodzaak en
-                  verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden
-                  door een gedeelde zoektocht.
-                </p>
-              </div>
-
-              <div class="intro-section">
-                <strong>Over deze kaart</strong>
-                <p>
-                  Op deze kaart vind je een verzameling van initiatieven in
-                  Rotterdam, verdeeld over verschillende categorieën en
-                  domeinen. De kaart is niet volledig, maar geeft een eerste
-                  indruk van de diversiteit aan initiatieven in de stad. Veel
-                  initiatieven laten zich niet eenvoudig in één domein plaatsen.
-                  Ze ontstaan vaak vanuit een behoefte of urgentie in een wijk
-                  of gemeenschap, en werken daardoor juist integraal en
-                  domeinoverstijgend. Toch hebben we gekozen voor een
-                  categorisering om de veelzijdigheid van initiatiefkracht beter
-                  leesbaar en navigeerbaar te maken. Zo hopen we dat
-                  initiatieven, organisaties en bewoners elkaar makkelijker
-                  kunnen vinden, versterken en ondersteunen. <br /> <br />Hier
-                  onder vind je een uitleg van de categorieën en domeinen die we
-                  gebruiken om de initiatieven te ordenen.
-                </p>
-              </div>
-
-              <div class="category-list">
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-point"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Plekken</strong>
-                    <p>
-                      Initiatieven met een vaste, fysieke locatie in de stad.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-area"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Wijken & Netwerken</strong>
-                    <p>
-                      Wijken: initiatieven die zich richten op een specifieke
-                      wijk of buurt. <br />
-                      Netwerken: initiatieven die verschillende partijen bij elkaar
-                      brengen, en actief zijn in een bepaald gebied.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="legend-marker legend-marker-koepel"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Koepels</strong>
-                    <p>
-                      Overkoepelende organisaties die meerdere initiatieven
-                      onder zich hebben en verbinden.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="category-item">
-                  <span
-                    class="domein-icon ph ph-house"
-                    style="color: {DOMEIN_COLORS['Wonen']}"
-                    aria-hidden="true"
-                  ></span>
-                  <div class="category-text">
-                    <strong>Domeinen</strong>
-                    <p>
-                      De initiatieven zijn onderverdeeld in domeinen. Sommige
-                      initiatieven vallen onder meerdere domeinen.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="waardebloem-section">
-                <p class="cta">
-                  <strong>Klik op de Waardenbloem</strong>
-                  en bekijk hoe de domeinen en categorieën zich tot elkaar verhouden.
-                </p>
-                <button
-                  class="waardebloem-icon-btn"
-                  onclick={() => (enlargedImage = "Waardebloem.png")}
-                  title="Klik om de Waardebloem te vergroten"
-                >
-                  <img src="Waardebloem.png" alt="Waardebloem" />
-                </button>
-              </div>
-              <div class="accordion-divider"></div>
-              <div class="intro-section">
-                <p>
-                  Deze kaart is ontwikkeld door AIR, in samenwerking met
-                  Groen010.
-                </p>
-                <div class="logos-section">
-                  <img src="AIR.png" alt="AIR logo" class="org-logo" />
-                  <img
-                    src="VG010_logo.png"
-                    alt="Groen010 logo"
-                    class="org-logo"
-                  />
-                </div>
-              </div>
-            </section>
-          </div>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("domein")}
-        >
-          <span>Domein</span>
-          <span class="icon">{openSections.domein ? "−" : "+"}</span>
-        </button>
-        {#if openSections.domein}
-          <div class="accordion-content">
-            {#each uniqueDomeinen as domein}
-              <label class="filter-item">
-                <input
-                  type="checkbox"
-                  checked={selectedDomeinen.includes(domein)}
-                  onchange={() =>
-                    (selectedDomeinen = toggleFilter(selectedDomeinen, domein))}
-                />
-                <span class="filter-text">{domein}</span>
-                <i
-                  class="ph {DOMEIN_ICONS[domein] ||
-                    DOMEIN_ICONS.default} sidebar-icon"
-                  style="color: {DOMEIN_COLORS[domein] ||
-                    DOMEIN_COLORS.default}"
-                ></i>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("koepel")}
-        >
-          <span>Koepels</span>
-          <span class="icon">{openSections.koepel ? "−" : "+"}</span>
-        </button>
-        {#if openSections.koepel}
-          <div class="accordion-content">
-            <div class="visual-toggle-container">
-              <span class="toggle-text">Toon kleuren per koepel</span>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  checked={visualMode === "koepel"}
-                  onchange={() => handleVisualToggle("koepel")}
-                />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <hr class="separator" />
-            {#each uniqueKoepels as koepel}
-              <label class="filter-item">
-                <input
-                  type="checkbox"
-                  checked={selectedKoepels.includes(koepel)}
-                  onchange={() =>
-                    (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
-                />
-                <span class="filter-text">{koepel}</span>
-                <span
-                  class="color-swatch"
-                  style="background-color: {KOEPEL_COLORS[koepel] ||
-                    KOEPEL_COLORS.default}"
-                ></span>
-              </label>
-            {/each}
-          </div>
-        {/if}
-      </div>
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("location")}
-        >
-          <span>Locatietype</span>
-          <span class="icon">{openSections.location ? "−" : "+"}</span>
-        </button>
-        {#if openSections.location}
-          <div class="accordion-content">
-            <div class="accordion-divider"></div>
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "points"}
-                onchange={() => (locationFilterMode = "points")}
-              />
-              <span class="legend-text">Toon alleen plekken</span>
-              <span class="legend-marker legend-marker-point" aria-hidden="true"
-              ></span>
-            </label>
-
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "areas"}
-                onchange={() => (locationFilterMode = "areas")}
-              />
-              <span class="legend-text">Toon alleen netwerken en wijken</span>
-              <span class="legend-marker legend-marker-area" aria-hidden="true"
-              ></span>
-            </label>
-
-            <label class="filter-item">
-              <input
-                type="checkbox"
-                checked={locationFilterMode === "all"}
-                onchange={() => (locationFilterMode = "all")}
-              />
-              <span class="legend-text">Toon alle initiatieven</span>
-            </label>
-          </div>
-        {/if}
-      </div>
-
-      <div class="accordion">
-        <button
-          class="accordion-header"
-          onclick={() => toggleSection("contribute")}
-        >
-          <span>Draag bij aan de kaart</span>
-          <span class="icon">{openSections.contribute ? "−" : "+"}</span>
-        </button>
-        {#if openSections.contribute}
-          <div class="accordion-content">
-            <p>
-              Heb je opmerkingen over de vermelding van jouw initiatief? Stuur
-              dan een email naar <a href="mailto:initiatiefkracht@gmail.com"
-                >initiatiefkracht@gmail.com</a
-              >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
-              initiatief
-              <a
-                href="https://forms.gle/2L41WPykgQH5QRAY7"
-                target="_blank"
-                rel="noopener noreferrer">hier</a
-              > aan!
-            </p>
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    {#if isAnyFilterActive}
-      <button class="reset-button" onclick={resetFilters}>
-        <i class="ph ph-arrow-counter-clockwise"></i>
-        <span>Reset filters</span>
+  <!-- Top Header Bar -->
+  <header class="top-header">
+    <div class="header-content">
+      <h1 class="top-title">IN OPBOUW:<br />INITIATIEFKRACHT IN KAART</h1>
+      <button
+        class="info-scroll-trigger"
+        onclick={isScrolledDown ? scrollToMap : scrollToInfo}
+        type="button"
+      >
+        <span>{isScrolledDown ? "KAART" : "INFORMATIE"}</span>
+        <i class="ph {isScrolledDown ? 'ph-caret-up' : 'ph-caret-down'}"></i>
       </button>
-    {/if}
-
-    <div class="stats">
-      <strong>{filteredPlaces.length}</strong> initiatieven getoond
     </div>
-  </aside>
+  </header>
 
-  {#if enlargedImage}
-    <div
-      class="image-modal"
-      onwheel={handleModalWheel}
-      onmousedown={handleModalMouseDown}
-      onmousemove={handleModalMouseMove}
-      onmouseup={handleModalMouseUp}
-      onmouseleave={handleModalMouseUp}
-      ontouchstart={handleModalTouchStart}
-      ontouchmove={handleModalTouchMove}
-      ontouchend={handleModalMouseUp}
+  <!-- Centered Map Frame (90% width) -->
+  <main class="map-frame">
+    <aside
+      class="sidebar"
+      class:open={mobileSidebarOpen}
+      onclick={(e) => e.stopPropagation()}
+      ontouchstart={(e) => e.stopPropagation()}
+      ontouchmove={(e) => e.stopPropagation()}
+      ontouchend={(e) => e.stopPropagation()}
+      onpointerdown={(e) => e.stopPropagation()}
+      onpointermove={(e) => e.stopPropagation()}
+      onpointerup={(e) => e.stopPropagation()}
+      onwheel={(e) => e.stopPropagation()}
       role="presentation"
     >
       <button
-        class="modal-close-btn"
-        onclick={closeImageModal}
-        aria-label="Sluiten"
+        class="mobile-toggle"
+        onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
       >
-        <i class="ph ph-x"></i>
+        <div class="toggle-content">
+          <i class="ph {mobileSidebarOpen ? 'ph-caret-down' : 'ph-caret-up'}"
+          ></i>
+          <span class="menu-text">menu</span>
+        </div>
       </button>
-      <div
-        class="modal-content"
-        style="transform: translate({modalPosition.x}px, {modalPosition.y}px) scale({modalScale}); cursor: {modalScale >
-        1
-          ? 'grab'
-          : 'default'}"
-      >
-        <img src={enlargedImage} alt="Enlarged" class="enlarged-image" />
-      </div>
-    </div>
-  {/if}
 
-  <div class="map-container" bind:this={mapContainer}>
-    {#if !isMobile && showQrBlock}
-      <div class="floating-qr-block">
-        <button
-          class="qr-close-btn"
-          onclick={() => (showQrBlock = false)}
-          aria-label="Sluiten"
-        >
-          <i class="ph ph-x"></i>
-        </button>
-        <div class="qr-content">
-          <p class="qr-info-text">
-            Op de kaart vind je slechts een kleine verzameling van de
-            initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
-            dus als je een initiatief mist, laat hem achter in de ideeënbus!
-          </p>
+      <div class="sidebar-inner">
+        <!-- Search Input -->
+        <div class="search-group">
+          <input
+            type="search"
+            class="search-input"
+            placeholder="Zoek op initiatiefnaam"
+            bind:value={searchQuery}
+            onkeydown={handleSearchKeyDown}
+            onfocus={() => (searchFocused = true)}
+            onblur={() => setTimeout(() => (searchFocused = false), 200)}
+          />
+          {#if searchFocused && searchSuggestions.length > 0}
+            <ul class="search-suggestions">
+              {#each searchSuggestions as suggestion, i}
+                <li>
+                  <button
+                    class="search-suggestion"
+                    class:highlighted={i === highlightedSearchIndex}
+                    onclick={() => selectPlaceOnMap(suggestion)}
+                    type="button"
+                  >
+                    {suggestion.name}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
 
-          <div class="qr-code-wrap">
-            <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
-          </div>
+        <!-- Accordions (Filters) -->
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("domein")}
+          >
+            <span>Domein</span>
+            <span class="icon">{openSections.domein ? "−" : "+"}</span>
+          </button>
+          {#if openSections.domein}
+            <div class="accordion-content">
+              {#each uniqueDomeinen as domein}
+                <label class="filter-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedDomeinen.includes(domein)}
+                    onchange={() =>
+                      (selectedDomeinen = toggleFilter(
+                        selectedDomeinen,
+                        domein,
+                      ))}
+                  />
+                  <span class="filter-text">{domein}</span>
+                  <i
+                    class="ph {DOMEIN_ICONS[domein] ||
+                      DOMEIN_ICONS.default} sidebar-icon"
+                    style="color: {DOMEIN_COLORS[domein] ||
+                      DOMEIN_COLORS.default}"
+                  ></i>
+                </label>
+              {/each}
+            </div>
+          {/if}
+        </div>
 
-          <p class="qr-scan-text">
-            Scan deze qr code om de kaart te ontdekken!
-          </p>
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("koepel")}
+          >
+            <span>Koepels</span>
+            <span class="icon">{openSections.koepel ? "−" : "+"}</span>
+          </button>
+          {#if openSections.koepel}
+            <div class="accordion-content">
+              <div class="visual-toggle-container">
+                <span class="toggle-text">Toon kleuren per koepel</span>
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    checked={visualMode === "koepel"}
+                    onchange={() => handleVisualToggle("koepel")}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <hr class="separator" />
+              {#each uniqueKoepels as koepel}
+                <label class="filter-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedKoepels.includes(koepel)}
+                    onchange={() =>
+                      (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
+                  />
+                  <span class="filter-text">{koepel}</span>
+                  <span
+                    class="color-swatch"
+                    style="background-color: {KOEPEL_COLORS[koepel] ||
+                      KOEPEL_COLORS.default}"
+                  ></span>
+                </label>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div class="accordion">
+          <button
+            class="accordion-header"
+            onclick={() => toggleSection("location")}
+          >
+            <span>Locatietype</span>
+            <span class="icon">{openSections.location ? "−" : "+"}</span>
+          </button>
+          {#if openSections.location}
+            <div class="accordion-content">
+              <div class="accordion-divider"></div>
+              <label class="filter-item">
+                <input
+                  type="checkbox"
+                  checked={locationFilterMode === "points"}
+                  onchange={() => (locationFilterMode = "points")}
+                />
+                <span class="legend-text">Toon alleen plekken</span>
+                <span
+                  class="legend-marker legend-marker-point"
+                  aria-hidden="true"
+                ></span>
+              </label>
+
+              <label class="filter-item">
+                <input
+                  type="checkbox"
+                  checked={locationFilterMode === "areas"}
+                  onchange={() => (locationFilterMode = "areas")}
+                />
+                <span class="legend-text">Toon alleen netwerken en wijken</span>
+                <span
+                  class="legend-marker legend-marker-area"
+                  aria-hidden="true"
+                ></span>
+              </label>
+
+              <label class="filter-item">
+                <input
+                  type="checkbox"
+                  checked={locationFilterMode === "all"}
+                  onchange={() => (locationFilterMode = "all")}
+                />
+                <span class="legend-text">Toon alle initiatieven</span>
+              </label>
+            </div>
+          {/if}
         </div>
       </div>
-    {/if}
+
+      {#if isAnyFilterActive}
+        <button class="reset-button" onclick={resetFilters}>
+          <i class="ph ph-arrow-counter-clockwise"></i>
+          <span>Reset filters</span>
+        </button>
+      {/if}
+
+      <div class="stats">
+        <strong>{filteredPlaces.length}</strong> initiatieven getoond
+      </div>
+    </aside>
+
+    <!-- Map Container -->
+    <div class="map-container" bind:this={mapContainer}>
+      {#if !isMobile && showQrBlock}{/if}
+    </div>
 
     {#if selectedPlace}
       <div
@@ -1326,9 +1156,9 @@
       >
         <div class="popup-top-bar">
           <h3 class="popup-title">{selectedPlace.name}</h3>
-          <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
-            >×</button
-          >
+          <button class="close-btn" onclick={closePopup} aria-label="Sluiten">
+            <i class="ph ph-x"></i>
+          </button>
         </div>
 
         <div class="air-popup">
@@ -1353,7 +1183,7 @@
                     .split(";")
                     .map((d) => d.trim()))] as d}
                 <span
-                  class="p-tag"
+                  class="p-tag domain-name-tag"
                   style="background-color: {DOMEIN_COLORS[d.trim()] ||
                     DOMEIN_COLORS.default}"
                 >
@@ -1394,48 +1224,295 @@
         </div>
       </div>
     {/if}
+  </main>
+
+  <!-- Centered Caret Button below the map -->
+  <div class="scroll-down-container">
+    <button
+      class="scroll-down-btn"
+      class:pointing-up={isScrolledDown}
+      onclick={isScrolledDown ? scrollToMap : scrollToInfo}
+      aria-label={isScrolledDown
+        ? "Scroll naar kaart"
+        : "Scroll naar informatie"}
+      type="button"
+    >
+      <i class="ph {isScrolledDown ? 'ph-caret-up' : 'ph-caret-down'}"></i>
+    </button>
   </div>
+
+  <!-- Bottom Info Section -->
+  <section class="bottom-info-section" bind:this={infoSection}>
+    <!-- Left Column: Waarom deze kaart & Over deze kaart -->
+    <div class="info-column block-left">
+      <h2>INFORMATIE</h2>
+
+      <div class="intro-section">
+        <strong>WAAROM DEZE KAART?</strong>
+        <p>
+          Overal in Rotterdam ontstaan er nieuwe initiatieven waarin mensen en
+          gemeenschappen, vaak onder de radar, experimenteren met alternatieven
+          voor de toekomst. Op het gebied van circulariteit, energie,
+          mobiliteit, natuur, voedsel, werken en wonen ontstaan praktijken die
+          niet wachten op beleid, maar handelen vanuit maatschappelijke noodzaak
+          en verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden door
+          een gedeelde zoektocht.
+        </p>
+      </div>
+
+      <div class="intro-section">
+        <strong>OVER DEZE KAART</strong>
+        <p>
+          Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
+          verdeeld over verschillende categorieën en domeinen. De kaart is niet
+          volledig, maar geeft een eerste indruk van de diversiteit aan
+          initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
+          in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
+          urgentie in een wijk of gemeenschap, en werken daardoor juist
+          integraal en domeinoverstijgend. Toch hebben we gekozen voor een
+          categorisering om de veelzijdigheid van initiatiefkracht beter
+          leesbaar en navigeerbaar te maken. Zo hopen we dat initiatieven,
+          organisaties en bewoners elkaar makkelijker kunnen vinden, versterken
+          en ondersteunen.
+        </p>
+      </div>
+    </div>
+
+    <!-- Middle Column: Category List (Plekken, Wijken & Netwerken, Koepels, Domeinen) -->
+    <div class="info-column block-middle">
+      <h2>LEGENDA</h2>
+      <p>
+        Hieronder vind je een uitleg van de categorieën en domeinen die we
+        gebruiken om de initiatieven te ordenen.
+      </p>
+      <div class="category-list">
+        <div class="category-item">
+          <span class="legend-marker legend-marker-point" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Plekken</strong>
+            <p>Initiatieven met een vaste, fysieke locatie in de stad.</p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span class="legend-marker legend-marker-area" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Wijken & Netwerken</strong>
+            <p>
+              Wijken: initiatieven die zich richten op een specifieke wijk of
+              buurt. <br />
+              Netwerken: initiatieven die verschillende partijen bij elkaar brengen,
+              en actief zijn in een bepaald gebied.
+            </p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span class="legend-marker legend-marker-koepel" aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Koepels</strong>
+            <p>
+              Overkoepelende organisaties die meerdere initiatieven onder zich
+              hebben en verbinden.
+            </p>
+          </div>
+        </div>
+
+        <div class="category-item">
+          <span
+            class="domein-icon ph ph-house"
+            style="color: {DOMEIN_COLORS['Wonen']}"
+            aria-hidden="true"
+          ></span>
+          <div class="category-text">
+            <strong>Domeinen</strong>
+            <p>
+              De initiatieven zijn onderverdeeld in domeinen. Sommige
+              initiatieven vallen onder meerdere domeinen.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Left: Draag bij aan de kaart -->
+    <div class="info-column block-contribute">
+      <h2>DRAAG BIJ AAN DE KAART</h2>
+      <p>
+        Heb je opmerkingen over de vermelding van een initiatief? Stuur dan een
+        email naar <a href="mailto:initiatiefkracht@gmail.com"
+          >initiatiefkracht@gmail.com</a
+        >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
+        initiatief
+        <a
+          href="https://forms.gle/2L41WPykgQH5QRAY7"
+          target="_blank"
+          rel="noopener noreferrer">hier</a
+        > aan!
+      </p>
+    </div>
+
+    <!-- Bottom Right: De waardenbloem -->
+    <div class="info-column block-waardebloem">
+      <h2>DE WAARDENBLOEM</h2>
+      <div class="waardebloem-content">
+        <p>
+          De waardenbloem illustreert hoe de verschillende domeinen met elkaar
+          verbonden zijn. Klik op de waardenbloem om hem beter te bekijken.
+        </p>
+        <button
+          class="waardebloem-icon-btn"
+          onclick={() => (enlargedImage = "Waardebloem.png")}
+          title="Klik om de Waardebloem te vergroten"
+        >
+          <img src="Waardebloem.png" alt="Waardebloem" />
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer with Logos and Credits -->
+  <footer class="bottom-footer">
+    <div class="footer-content">
+      <p>
+        Deze kaart is ontwikkeld door
+        <a href="https://airrotterdam.eu"> AIR </a>, in samenwerking met
+        <a href="https://groen010.nl"> Groen010 </a>.
+      </p>
+
+      <div class="logos-section">
+        <img src="AIR.png" alt="AIR logo" class="org-logo" />
+        <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+      </div>
+    </div>
+  </footer>
+
+  <!-- Image zoom modal -->
+  {#if enlargedImage}
+    <div
+      class="image-modal"
+      onwheel={handleModalWheel}
+      onmousedown={handleModalMouseDown}
+      onmousemove={handleModalMouseMove}
+      onmouseup={handleModalMouseUp}
+      onmouseleave={handleModalMouseUp}
+      ontouchstart={handleModalTouchStart}
+      ontouchmove={handleModalTouchMove}
+      ontouchend={handleModalMouseUp}
+      role="presentation"
+    >
+      <button
+        class="modal-close-btn"
+        onclick={closeImageModal}
+        aria-label="Sluiten"
+      >
+        <i class="ph ph-x"></i>
+      </button>
+      <div
+        class="modal-content"
+        style="transform: translate({modalPosition.x}px, {modalPosition.y}px) scale({modalScale}); cursor: {modalScale >
+        1
+          ? 'grab'
+          : 'default'}"
+      >
+        <img src={enlargedImage} alt="Enlarged" class="enlarged-image" />
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
+
   :global(#app) {
     margin: 0 !important;
     padding: 0 !important;
     max-width: none !important;
+    width: 100%;
   }
 
   :global(html),
   :global(body) {
     margin: 0;
     padding: 0;
-    overflow: hidden;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
+    background: #fdfcf7;
+    display: block !important;
+    font-family: "Inter", sans-serif;
   }
 
   .layout {
     display: flex;
-    width: 100%; /* was 100vw */
-    height: 100%; /* was 100vh */
-    position: fixed;
-    top: 0;
-    left: 0;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+    background: #ffffff;
   }
+
+  .top-header {
+    background: #ffffff;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    position: sticky;
+    top: 0;
+    z-index: 2000;
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+  }
+
+  .top-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #5d69fb;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: inherit;
+    vertical-align: text-bottom;
+    margin-top: 20px;
+    text-align: left;
+    margin-bottom: 3px;
+  }
+
+  .map-frame {
+    position: relative;
+    width: 98%;
+    max-width: 1990px;
+    height: 83vh;
+    min-height: 600px;
+    margin: 0 auto 10px auto;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
   .sidebar {
-    width: 350px;
-    height: 100%;
-    background: #fbf9f9;
-    border-right: 1px solid rgba(0, 0, 0, 0.05);
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    width: 280px;
+    height: auto;
+    max-height: calc(100% - 30px);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    z-index: 10;
-    overflow-y: hidden;
-    scrollbar-gutter: stable;
-    font-family: "Helvetica", Arial, sans-serif;
-    position: relative;
+    z-index: 1000;
+    overflow: hidden;
+    font-family: inherit;
+    box-sizing: border-box;
   }
   .sidebar-inner {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -1466,9 +1543,9 @@
       left: 0;
       width: 100%;
       height: 60px;
-      background: #fbf9f9;
+      background: #ffffff;
       color: #5d69fb;
-      font-family: "Helvetica", Arial, sans-serif;
+      font-family: inherit;
       font-weight: 900;
       font-size: 1.4rem;
       align-items: center;
@@ -1479,37 +1556,27 @@
     }
 
     .fixed-air-popup {
-      top: 80px !important;
+      top: 15px !important;
       right: unset !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
       width: 90% !important;
       max-width: 400px !important;
-      max-height: none !important;
-      border-radius: 8px !important;
+      max-height: calc(100% - 30px) !important;
+      border-radius: 12px !important;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
       border: 1px solid rgba(0, 0, 0, 0.05) !important;
-      overflow-y: hidden !important;
-    }
-
-    .sidebar {
-      position: fixed;
-      top: auto;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 50dvh;
-      max-height: 50dvh;
-      border-right: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.1);
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-      z-index: 2000;
-      transform: translateY(calc(50dvh - 50px));
-      transition: transform 0.3s ease-in-out;
+      overflow-y: auto !important;
+      z-index: 2010 !important;
     }
 
     .sidebar.open {
       transform: translateY(0);
+    }
+
+    .scroll-down-btn {
+      padding-top: 4px;
+      margin-top: -4px;
     }
 
     .mobile-toggle {
@@ -1518,7 +1585,7 @@
       justify-content: center;
       width: 100%;
       height: 50px;
-      background: #fbf9f9;
+      background: #ffffff;
       border: none;
       border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       font-family: inherit;
@@ -1571,7 +1638,7 @@
 
     .popup-title {
       font-size: 0.9rem !important;
-      line-height: 1.1 !important;
+      line-height: 1.3 !important;
     }
 
     .air-popup {
@@ -1598,40 +1665,32 @@
     }
 
     .popup-info-row {
-      margin-bottom: 0 !important;
+      margin-bottom: 4px !important;
       flex: none !important;
       width: 100% !important;
     }
 
     .popup-info-row .label {
       font-size: 0.6rem !important;
-      margin-bottom: 2px !important;
+      margin-bottom: 4px !important;
+      margin-top: 4px !important;
     }
 
     .popup-tags {
       margin-top: 0 !important;
-      margin-bottom: 2px !important;
-    }
-
-    .p-tag {
-      font-size: 8px !important;
-      padding: 2px 4px !important;
-      margin-bottom: 5px !important;
-    }
-
-    .buurt-tag {
-      font-size: 7.5px !important;
+      margin-bottom: 4px !important;
     }
 
     .popup-footer {
       width: 100%;
-      margin-top: 0 !important;
+      margin-top: 4px !important;
       padding-top: 0 !important;
       border-top: none !important;
     }
 
     .popup-link {
       font-size: 10px !important;
+      padding-bottom: 4px !important;
     }
 
     :global(.maplibregl-ctrl-bottom-right) {
@@ -1667,13 +1726,13 @@
     font-size: 1.4rem;
     letter-spacing: -0.5px;
     color: #5d69fb;
-    background-color: #fbf9f9;
+    background-color: #ffffff;
     text-align: center;
   }
   .location-filter {
     padding: 16px 20px;
     border-bottom: 1px solid #e0ddd5;
-    background: #fbf9f9;
+    background: #ffffff;
   }
   .search-group {
     margin-bottom: 12px;
@@ -1733,11 +1792,11 @@
   }
   .accordion {
     border-bottom: 1px solid #e0ddd5;
-    background: #fbf9f9;
+    background: #ffffff;
     transition: background-color 0.2s ease;
   }
   .accordion:has(.accordion-content) {
-    background: #fbf9f9;
+    background: #ffffff;
   }
   .accordion-header {
     width: 100%;
@@ -1794,7 +1853,7 @@
     font-weight: 500;
     cursor: pointer;
     text-align: left;
-    border-radius: 6px;
+    /* border-radius: 6px; */
     transition: all 0.2s ease;
     user-select: none;
   }
@@ -1817,7 +1876,7 @@
     letter-spacing: 0.02rem;
     color: #999;
     font-weight: bold;
-    background: #fbf9f9;
+    background: #ffffff;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
   }
@@ -1985,31 +2044,35 @@
     border: 1px solid rgba(0, 0, 0, 0.1);
   }
   .map-container {
-    flex-grow: 1;
+    width: 100%;
     height: 100%;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    box-sizing: border-box;
   }
 
   .fixed-air-popup {
     position: absolute;
-    top: 12px;
-    right: 20px;
-
+    top: 15px;
+    right: 15px;
     bottom: auto;
-
     width: 300px;
-
-    background: #fffcf4;
-    border-radius: 6px;
+    max-height: calc(100% - 30px);
+    background: #ffffff;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 16px;
     box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.1),
-      5px 5px 0px rgba(132, 80, 255, 0.15);
+      0 8px 32px rgba(0, 0, 0, 0.15),
+      5px 5px 0px rgba(132, 80, 255, 0.1);
     z-index: 2000;
-
-    font-family: "Helvetica", Arial, sans-serif;
+    font-family: inherit;
     text-align: left;
     overflow-y: auto;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-sizing: border-box;
   }
   .popup-top-bar {
     display: flex;
@@ -2037,12 +2100,12 @@
   .close-btn {
     background: #ffffff;
     border: none;
-    font-size: 22px;
-    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-family: inherit;
     cursor: pointer;
     color: #5d69fb;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2053,7 +2116,7 @@
     line-height: 0;
   }
   .close-btn:hover {
-    background-color: #fbf9f9;
+    background-color: #ffffff;
     color: #1a1a1a;
   }
   .air-popup {
@@ -2094,16 +2157,25 @@
   }
 
   .p-tag {
-    font-size: 9px;
+    font-size: 10px;
     padding: 3px 6px;
     margin-right: 4px;
     margin-bottom: 4px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     text-transform: uppercase;
     font-weight: bold;
-    color: #fbf9f9;
+    color: #ffffff;
     display: inline-block;
     border-radius: 5px;
+  }
+  .domain-name-tag {
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: fit-content;
+    height: fit-content;
   }
   a.p-tag {
     cursor: pointer;
@@ -2115,8 +2187,8 @@
   .buurt-tag {
     background-color: #999;
     color: #fff !important;
-    font-size: 7.5px;
-    padding: 1px 4px;
+    font-size: 10px;
+    padding: 2px 4px;
   }
   .popup-tags {
     display: flex;
@@ -2134,7 +2206,7 @@
   }
   .popup-link:hover {
     color: #5d69fb;
-    background: #fbf9f9;
+    background: #ffffff;
   }
 
   :global(.marker-container) {
@@ -2201,12 +2273,10 @@
     justify-content: center;
     gap: 20px;
     margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #e0ddd5;
   }
 
   .org-logo {
-    height: 50px;
+    height: 80px;
     object-fit: contain;
   }
 
@@ -2277,39 +2347,58 @@
 
   .waardebloem-section {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 16px;
     margin-top: 8px;
     padding-top: 12px;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-top: none;
+    text-align: center;
   }
 
   .waardebloem-icon-btn {
-    width: 60px;
-    height: 60px;
+    width: 200px;
+    height: 200px;
     flex-shrink: 0;
-    padding: 4px;
+    padding: 8px;
     background: white;
-    border: 1px solid #d8d2c8;
-    border-radius: 12px;
     cursor: pointer;
     overflow: hidden;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .waardebloem-icon-btn:hover {
-    border-color: #5d69fb;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(93, 105, 251, 0.1);
+    transform: scale(1.03) translateY(-2px);
   }
 
   .waardebloem-icon-btn img {
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .block-waardebloem .waardebloem-content {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+    justify-content: space-between;
+  }
+
+  .block-waardebloem .waardebloem-content p {
+    margin: 0;
+    flex: 1;
+    font-size: 0.95rem;
+    color: #444444;
+  }
+
+  .block-waardebloem .waardebloem-icon-btn {
+    width: 160px;
+    height: 160px;
+    margin-top: -8px;
   }
 
   .reset-button {
@@ -2334,7 +2423,7 @@
     position: sticky;
     bottom: 0;
     z-index: 90;
-    box-shadow: 0 -10px 20px #fbf9f9;
+    box-shadow: 0 -10px 20px #ffffff;
   }
   .reset-button:hover {
     background: #f0edeb;
@@ -2414,6 +2503,7 @@
 
   .intro-section {
     margin-bottom: 8px;
+    text-align: left;
   }
 
   .intro-section strong {
@@ -2431,19 +2521,10 @@
   }
 
   .category-item {
-    background: #ffffff;
-    border: 1px solid #d8d2c8;
-    border-radius: 8px;
     padding: 12px;
     display: flex;
     gap: 14px;
     align-items: center;
-    transition: transform 0.2s ease;
-  }
-
-  .category-item:hover {
-    transform: translateX(4px);
-    border-color: #5d69fb44;
   }
 
   .category-text {
@@ -2452,7 +2533,7 @@
 
   .category-text strong {
     display: block;
-    font-size: 0.75rem;
+    font-size: 0.95rem;
     color: #5d69fb;
     margin-bottom: 2px;
     text-transform: uppercase;
@@ -2462,7 +2543,7 @@
 
   .category-item p {
     margin: 0 !important;
-    font-size: 0.75rem !important;
+    font-size: 0.8rem !important;
   }
 
   .initiatives-intro .cta {
@@ -2476,5 +2557,332 @@
 
   .initiatives-intro .cta strong {
     color: #5d69fb;
+  }
+
+  .bottom-info-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    width: 98%;
+    margin: 10px auto 50px auto;
+    padding-top: 30px;
+    box-sizing: border-box;
+    max-width: 1200px;
+  }
+
+  .info-column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background: #ffffff;
+    padding: 30px;
+    font-family: "Inter", sans-serif;
+    color: #444444;
+    line-height: 1.6;
+    box-sizing: border-box;
+    text-align: left;
+  }
+
+  .info-column h2 {
+    margin: 0 0 6px 0;
+    font-size: 1.8rem;
+    color: #333333;
+    font-weight: 800;
+    padding-bottom: 0px;
+    width: fit-content;
+  }
+
+  .intro-section p {
+    font-size: 0.95rem;
+    color: #444444;
+  }
+
+  .partners-logos {
+    padding-top: 15px;
+  }
+
+  .block-contribute p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #555555;
+    text-align: left;
+  }
+
+  .block-contribute a {
+    color: #5d69fb;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  /* Responsive styling to gracefully stack layout on tablets and mobile screens */
+  @media (max-width: 900px) {
+    .info-scroll-trigger {
+      display: none !important;
+    }
+
+    .top-title {
+      font-size: 1.15rem !important;
+      margin-left: 36px !important;
+    }
+
+    .map-frame {
+      flex-direction: column;
+      height: calc(100dvh - 90px - 60px) !important;
+      min-height: auto !important;
+      width: 95% !important;
+      /* margin: 0 !important;
+      gap: 0 !important;
+      border-radius: 0 !important; */
+    }
+
+    .sidebar {
+      position: absolute !important;
+      top: auto !important;
+      bottom: 12px !important;
+      left: 12px !important;
+      right: 12px !important;
+      width: calc(100% - 24px) !important;
+      height: 5dvh !important;
+      max-height: 50dvh !important;
+      background: #ffffff !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+      z-index: 1000 !important;
+      transform: translateY(calc(100% - 50px)) !important;
+      transition: transform 0.33s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    .sidebar.open {
+      transform: translateY(0) !important;
+      height: 50dvh !important;
+      transition: all 0.5s ease-in-out;
+    }
+
+    .map-container {
+      position: absolute !important;
+      width: 100% !important;
+      height: 100% !important;
+      top: 0 !important;
+      left: 0 !important;
+    }
+
+    .scroll-down-container {
+      width: 100% !important;
+      height: 60px !important;
+      background: #ffffff !important;
+      /* border-top: 1px solid rgba(0, 0, 0, 0.08) !important; */
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      margin: 0 !important;
+      padding: 0 !important;
+      /* box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.02) !important; */
+      z-index: 100 !important;
+      position: relative !important;
+    }
+
+    .bottom-info-section {
+      grid-template-columns: 1fr;
+      width: 95%;
+      gap: 24px;
+      margin: 20px auto 40px auto;
+    }
+
+    .block-waardebloem .waardebloem-content {
+      flex-direction: column;
+      align-items: center;
+      text-align: left;
+      gap: 16px;
+    }
+
+    .block-waardebloem .waardebloem-icon-btn {
+      width: 180px;
+      height: 180px;
+    }
+
+    .header-content {
+      width: 95%;
+    }
+
+    .top-header {
+      box-shadow: none;
+    }
+  }
+
+  /* Custom styling for scrolling triggers and buttons */
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 98%;
+    max-width: 1990px;
+    margin: 0 auto;
+    gap: 16px;
+  }
+
+  .info-scroll-trigger {
+    display: flex;
+    align-items: right;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #5d69fb;
+    padding: 8px 16px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 50px;
+    margin-bottom: 3px;
+  }
+
+  .info-scroll-trigger:hover {
+    color: #000000;
+  }
+
+  .info-scroll-trigger:focus,
+  .info-scroll-trigger:active,
+  .info-scroll-trigger:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .info-scroll-trigger i {
+    font-size: 1.1rem;
+    transition: transform 0.2s ease;
+  }
+
+  .info-scroll-trigger:hover i.ph-caret-down {
+    transform: translateY(2px);
+  }
+
+  .info-scroll-trigger:hover i.ph-caret-up {
+    transform: translateY(-2px);
+  }
+
+  .scroll-down-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    margin-bottom: 10px;
+    margin-top: 0px;
+  }
+
+  .scroll-down-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: #ffffff;
+    outline: none;
+    color: #5d69fb;
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: bounce 2.5s infinite;
+  }
+
+  .scroll-down-btn:hover {
+    color: #000000;
+    transform: translateY(3px);
+    animation-play-state: paused;
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .scroll-down-btn.pointing-up:hover {
+    transform: translateY(-3px);
+  }
+
+  .scroll-down-btn:focus,
+  .scroll-down-btn:active,
+  .scroll-down-btn:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  @keyframes bounce {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-6px);
+    }
+    60% {
+      transform: translateY(-3px);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .info-scroll-trigger span {
+      display: none;
+    }
+    .info-scroll-trigger {
+      padding: 8px;
+      border-radius: 50%;
+      background: rgba(93, 105, 251, 0.05);
+    }
+  }
+
+  /* Footer Styling */
+  .bottom-footer {
+    width: 100%;
+    background: #ffffff;
+    padding: 40px 0;
+    border-top: 1px solid #b1b1b1;
+    width: 60%;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 98%;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .footer-content p {
+    font-size: 0.95rem;
+    color: #444444;
+    margin: 0;
+    font-family: "Inter", sans-serif;
+  }
+
+  .footer-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+  }
+
+  .footer-logos img {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
   }
 </style>
