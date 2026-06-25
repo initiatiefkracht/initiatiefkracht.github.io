@@ -3,6 +3,140 @@
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
+  import { layers as getProtomapsLayers, LIGHT, DARK } from "@protomaps/basemaps";
+  import { MAP_COLORS } from "./map-colors";
+
+  let geoJsonData = $state(null);
+
+  function getFullStyle() {
+    const baseTheme = MAP_COLORS.baseTheme === "dark" ? DARK : LIGHT;
+
+    const customFlavor = {
+      ...baseTheme,
+      background: MAP_COLORS.earth,
+      earth: MAP_COLORS.earth,
+      water: MAP_COLORS.water,
+      buildings: MAP_COLORS.buildings,
+      
+      // Parks & wood
+      park_a: MAP_COLORS.parks,
+      park_b: MAP_COLORS.parks,
+      wood_a: MAP_COLORS.parks,
+      wood_b: MAP_COLORS.parks,
+      scrub_a: MAP_COLORS.parks,
+      scrub_b: MAP_COLORS.parks,
+
+      // Roads
+      minor_a: MAP_COLORS.roads,
+      minor_b: MAP_COLORS.roads,
+      minor_service: MAP_COLORS.roads,
+      link: MAP_COLORS.roads,
+      major: MAP_COLORS.roads,
+      highway: MAP_COLORS.roads,
+      other: MAP_COLORS.roads,
+      bridges_minor: MAP_COLORS.roads,
+      bridges_link: MAP_COLORS.roads,
+      bridges_major: MAP_COLORS.roads,
+      bridges_highway: MAP_COLORS.roads,
+      tunnel_minor: MAP_COLORS.roads,
+      tunnel_link: MAP_COLORS.roads,
+      tunnel_major: MAP_COLORS.roads,
+      tunnel_highway: MAP_COLORS.roads,
+
+      // Road Casings
+      minor_casing: MAP_COLORS.roadCasing,
+      link_casing: MAP_COLORS.roadCasing,
+      major_casing_late: MAP_COLORS.roadCasing,
+      highway_casing_late: MAP_COLORS.roadCasing,
+      major_casing_early: MAP_COLORS.roadCasing,
+      highway_casing_early: MAP_COLORS.roadCasing,
+      tunnel_minor_casing: MAP_COLORS.roadCasing,
+      tunnel_link_casing: MAP_COLORS.roadCasing,
+      tunnel_major_casing: MAP_COLORS.roadCasing,
+      tunnel_highway_casing: MAP_COLORS.roadCasing,
+      bridges_minor_casing: MAP_COLORS.roadCasing,
+      bridges_link_casing: MAP_COLORS.roadCasing,
+      bridges_major_casing: MAP_COLORS.roadCasing,
+      bridges_highway_casing: MAP_COLORS.roadCasing,
+
+      // Labels
+      city_label: MAP_COLORS.labels,
+      state_label: MAP_COLORS.labels,
+      country_label: MAP_COLORS.labels,
+      roads_label_minor: MAP_COLORS.labels,
+      roads_label_major: MAP_COLORS.labels,
+      subplace_label: MAP_COLORS.labels,
+      address_label: MAP_COLORS.labels,
+      ocean_label: MAP_COLORS.water,
+
+      // Label Halos
+      city_label_halo: MAP_COLORS.labelHalo,
+      state_label_halo: MAP_COLORS.labelHalo,
+      roads_label_minor_halo: MAP_COLORS.labelHalo,
+      roads_label_major_halo: MAP_COLORS.labelHalo,
+      subplace_label_halo: MAP_COLORS.labelHalo,
+      address_label_halo: MAP_COLORS.labelHalo,
+    };
+
+    const baseLayers = getProtomapsLayers("protomaps", customFlavor, { lang: "nl" });
+
+    baseLayers.forEach((layer) => {
+      if (layer.id === 'buildings') {
+        if (layer.paint && 'fill-outline-color' in layer.paint) {
+          layer.paint['fill-outline-color'] = 'rgba(139, 134, 123, 0.4)';
+        }
+        if (layer.paint && 'fill-opacity' in layer.paint) {
+          layer.paint['fill-opacity'] = 0.6;
+        }
+      }
+    });
+
+    const style = {
+      version: 8,
+      glyphs: "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
+      sprite: MAP_COLORS.baseTheme === "dark" 
+        ? "https://protomaps.github.io/basemaps-assets/sprites/v4/dark" 
+        : "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
+      sources: {
+        protomaps: {
+          type: "vector",
+          url: "https://api.protomaps.com/tiles/v4.json?key=ca7652ec836f269a",
+          attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+        }
+      },
+      layers: baseLayers
+    };
+
+    if (geoJsonData) {
+      style.sources["rotterdam-buurten"] = {
+        type: "geojson",
+        data: geoJsonData
+      };
+      
+      const labelsIndex = baseLayers.findIndex(l => l.id.includes("label") || l.id.includes("place"));
+      const buurtenFillLayer = {
+        id: "buurten-fill",
+        type: "fill",
+        source: "rotterdam-buurten",
+        paint: {
+          "fill-color": "#5d69fb",
+          "fill-opacity": [
+            "coalesce",
+            ["feature-state", "highlightOpacity"],
+            0,
+          ],
+        },
+      };
+
+      if (labelsIndex !== -1) {
+        style.layers.splice(labelsIndex, 0, buurtenFillLayer);
+      } else {
+        style.layers.push(buurtenFillLayer);
+      }
+    }
+
+    return style;
+  }
 
   let mapContainer = $state();
   let map = $state();
@@ -83,9 +217,10 @@
   let showQrBlock = $state(true);
 
   function initMap(geoData) {
+    const initialStyle = getFullStyle();
     map = new maplibregl.Map({
       container: mapContainer,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style: initialStyle,
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -104,28 +239,6 @@
     );
 
     map.on("load", () => {
-      map.addSource("rotterdam-buurten", {
-        type: "geojson",
-        data: geoData,
-      });
-
-      map.addLayer(
-        {
-          id: "buurten-fill",
-          type: "fill",
-          source: "rotterdam-buurten",
-          paint: {
-            "fill-color": "#5d69fb",
-            "fill-opacity": [
-              "coalesce",
-              ["feature-state", "highlightOpacity"],
-              0,
-            ],
-          },
-        },
-        "watername_ocean",
-      );
-
       mapLoaded = true;
     });
   }
@@ -692,6 +805,7 @@
 
         ensureUniqueCoordinates(allPlaces);
 
+        geoJsonData = geoData;
         initMap(geoData);
       },
     });
@@ -2724,6 +2838,7 @@
       padding: 20px !important;
       height: 100% !important;
       box-sizing: border-box !important;
+      background-color: #ffffff !important;
     }
 
     .map-container {
