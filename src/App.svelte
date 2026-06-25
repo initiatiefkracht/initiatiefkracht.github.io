@@ -323,6 +323,9 @@
     }
 
     selectedPlace = place;
+    if (isMobile) {
+      mobileSidebarOpen = false;
+    }
     const markerEntry = markerMap.get(place);
     if (markerEntry) {
       activeMarkerElement = markerEntry.element;
@@ -961,10 +964,15 @@
     >
       <button
         class="mobile-toggle"
-        onclick={() => (mobileSidebarOpen = !mobileSidebarOpen)}
+        onclick={() => {
+          mobileSidebarOpen = !mobileSidebarOpen;
+          if (mobileSidebarOpen) {
+            closePopup();
+          }
+        }}
       >
         <div class="toggle-content">
-          <i class="ph {mobileSidebarOpen ? 'ph-caret-down' : 'ph-caret-up'}"
+          <i class="ph {mobileSidebarOpen ? 'ph-caret-left' : 'ph-caret-right'}"
           ></i>
           <span class="menu-text">menu</span>
         </div>
@@ -1125,17 +1133,16 @@
             </div>
           {/if}
         </div>
-      </div>
+        {#if isAnyFilterActive}
+          <button class="reset-button" onclick={resetFilters}>
+            <i class="ph ph-arrow-counter-clockwise"></i>
+            <span>Reset filters</span>
+          </button>
+        {/if}
 
-      {#if isAnyFilterActive}
-        <button class="reset-button" onclick={resetFilters}>
-          <i class="ph ph-arrow-counter-clockwise"></i>
-          <span>Reset filters</span>
-        </button>
-      {/if}
-
-      <div class="stats">
-        <strong>{filteredPlaces.length}</strong> initiatieven getoond
+        <div class="stats">
+          <strong>{filteredPlaces.length}</strong> initiatieven getoond
+        </div>
       </div>
     </aside>
 
@@ -1557,10 +1564,11 @@
 
     .fixed-air-popup {
       top: 15px !important;
+      bottom: auto !important;
       right: unset !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
-      width: 90% !important;
+      width: 75% !important;
       max-width: 400px !important;
       max-height: calc(100% - 30px) !important;
       border-radius: 12px !important;
@@ -1694,7 +1702,8 @@
     }
 
     :global(.maplibregl-ctrl-bottom-right) {
-      bottom: 90px !important;
+      bottom: 12px !important;
+      right: 12px !important;
     }
 
     .filter-item {
@@ -1737,9 +1746,9 @@
   .search-group {
     margin-bottom: 12px;
     position: relative;
-    margin-left: 20px;
-    margin-right: 20px;
-    margin-top: 8px;
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-top: 10px;
   }
   .search-input {
     width: 100%;
@@ -2637,31 +2646,84 @@
 
     .sidebar {
       position: absolute !important;
-      top: auto !important;
+      top: 100px !important;
       bottom: 12px !important;
-      left: 12px !important;
-      right: 12px !important;
-      width: calc(100% - 24px) !important;
-      height: 5dvh !important;
-      max-height: 50dvh !important;
+      left: 0 !important;
+      right: auto !important;
+      width: 35px !important;
+      height: calc(100% - 200px) !important;
+      max-height: none !important;
       background: #ffffff !important;
-      border-radius: 12px !important;
+      border-radius: 0 12px 12px 0 !important;
       border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      border-left: none !important;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
       z-index: 1000 !important;
-      transform: translateY(calc(100% - 50px)) !important;
-      transition: transform 0.33s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      transform: none !important;
+      transition: width 0.33s cubic-bezier(0.4, 0, 0.2, 1) !important;
       overflow: hidden !important;
       padding: 0 !important;
       margin: 0 !important;
       display: flex !important;
-      flex-direction: column !important;
+      flex-direction: row-reverse !important;
     }
 
     .sidebar.open {
-      transform: translateY(0) !important;
-      height: 50dvh !important;
-      transition: all 0.5s ease-in-out;
+      width: 90% !important;
+      height: calc(100% - 200px) !important;
+      transform: none !important;
+    }
+
+    .mobile-toggle {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      width: 50px !important;
+      height: 100% !important;
+      background: #ffffff !important;
+      border: none !important;
+      border-left: 1px solid rgba(0, 0, 0, 0.05) !important;
+      font-family: inherit !important;
+      color: #5d69fb !important;
+      cursor: pointer !important;
+      padding: 0 !important;
+      position: relative !important;
+      top: auto !important;
+      z-index: 100 !important;
+      flex-shrink: 0 !important;
+    }
+
+    .toggle-content {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 12px !important;
+      line-height: 1 !important;
+    }
+
+    .toggle-content i {
+      font-size: 1.4rem !important;
+      margin-bottom: 0 !important;
+    }
+
+    .menu-text {
+      writing-mode: vertical-rl !important;
+      text-orientation: mixed !important;
+      font-size: 0.75rem !important;
+      font-weight: 800 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.15rem !important;
+      padding: 0 !important;
+      margin-top: 4px !important;
+    }
+
+    .sidebar-inner {
+      flex: 1 !important;
+      overflow-y: auto !important;
+      padding: 20px !important;
+      height: 100% !important;
+      box-sizing: border-box !important;
     }
 
     .map-container {
