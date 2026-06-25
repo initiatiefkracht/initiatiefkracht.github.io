@@ -368,7 +368,7 @@
     map.flyTo({
       center: [place.longitude, place.latitude],
       zoom: targetZoom,
-      padding,
+      padding: { top: 0, bottom: 0, left: 0, right: 0 },
       speed: 0.8,
       curve: 1.2,
       essential: true,
