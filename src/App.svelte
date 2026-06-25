@@ -16,7 +16,6 @@
   let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
-  let activeHoveredDomein = $state(null);
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
   let enlargedImage = $state(null);
@@ -622,98 +621,6 @@
     return parts.join("; ");
   }
 
-  const createPureCircleSVG = (
-    domeinen,
-    size = 48,
-    borderColor = "#000000",
-  ) => {
-    const domeinList = (domeinen || "")
-      .split(";")
-      .map((d) => d.trim())
-      .filter(Boolean);
-
-    // Determine the number of domains.
-    // If 0, fallback to 1 (using default domain color)
-    const N = domeinList.length === 0 ? 1 : Math.min(domeinList.length, 6);
-
-    const colors = [];
-    const names = [];
-
-    if (domeinList.length === 0) {
-      colors.push(DOMEIN_COLORS.default);
-      names.push("default");
-    } else {
-      for (let i = 0; i < N; i++) {
-        const d = domeinList[i];
-        colors.push(DOMEIN_COLORS[d] || DOMEIN_COLORS.default);
-        names.push(d);
-      }
-    }
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const R = size / 2 - 2;
-
-    const getVertices = (numSides, radius) => {
-      const pts = [];
-      const startAngle = numSides === 4 ? -45 : -90; // Align square flat-bottomed, others pointed up
-      for (let i = 0; i < numSides; i++) {
-        const angle_rad = (Math.PI / 180) * ((360 / numSides) * i + startAngle);
-        pts.push({
-          x: cx + radius * Math.cos(angle_rad),
-          y: cy + radius * Math.sin(angle_rad),
-        });
-      }
-      return pts;
-    };
-
-    let trianglesHtml = "";
-    let borderHtml = "";
-
-    if (N === 1) {
-      // 1 domain: just one regular triangle
-      const pts = getVertices(3, R);
-      trianglesHtml = `<path class="hex-triangle" data-domain="${names[0]}" d="M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y} L ${pts[2].x} ${pts[2].y} Z" fill="${colors[0]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[0]}</title></path>`;
-      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
-      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round" />`;
-    } else if (N === 2) {
-      // 2 domains: regular triangle split in two halves
-      const pts = getVertices(3, R);
-      const p0 = pts[0];
-      const p1 = pts[1];
-      const p2 = pts[2];
-      const pmid = {
-        x: (p1.x + p2.x) / 2,
-        y: (p1.y + p2.y) / 2,
-      };
-
-      // Left half (corresponds to names[0]/colors[0])
-      trianglesHtml += `<path class="hex-triangle" data-domain="${names[0]}" d="M ${p0.x} ${p0.y} L ${pmid.x} ${pmid.y} L ${p2.x} ${p2.y} Z" fill="${colors[0]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[0]}</title></path>`;
-
-      // Right half (corresponds to names[1]/colors[1])
-      trianglesHtml += `<path class="hex-triangle" data-domain="${names[1]}" d="M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${pmid.x} ${pmid.y} Z" fill="${colors[1]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[1]}</title></path>`;
-
-      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
-      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" stroke-linejoin="round" />`;
-    } else {
-      // N = 3 (triangle), 4 (square), 5 (pentagon), 6 (hexagon)
-      // all split to the middle into N triangles
-      const pts = getVertices(N, R);
-      for (let i = 0; i < N; i++) {
-        const p1 = pts[i];
-        const p2 = pts[(i + 1) % N];
-        trianglesHtml += `<path class="hex-triangle" data-domain="${names[i]}" d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[i]}</title></path>`;
-      }
-      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
-      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round" />`;
-    }
-
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
-      ${trianglesHtml}
-      ${borderHtml}
-    </svg>`;
-  };
-
   let buurtToFeatureIds = new Map();
 
   $effect(() => {
@@ -795,7 +702,6 @@
       activeMarkerContainer.style.zIndex = "";
     }
     selectedPlace = null;
-    activeHoveredDomein = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
     clickedAreaGebieden = [];
@@ -1272,59 +1178,18 @@
 
           <div class="popup-info-row domains-row">
             <span class="label">Domeinen</span>
-            <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-            <div
-              class="domains-layout-container"
-              class:has-hovered-domain={activeHoveredDomein !== null}
-              style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;"
-            >
-              <!-- Hexagon Container -->
-              <div
-                role="presentation"
-                style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
-                class="hexagon-container"
-                data-hovered-domain={activeHoveredDomein || ""}
-                onmouseover={(e) => {
-                  const target = e.target.closest(".hex-triangle");
-                  if (target) {
-                    activeHoveredDomein = target.getAttribute("data-domain");
-                  }
-                }}
-                onmouseout={(e) => {
-                  const toElement = e.relatedTarget;
-                  if (!toElement || !e.currentTarget.contains(toElement)) {
-                    activeHoveredDomein = null;
-                  }
-                }}
-              >
-                {@html createPureCircleSVG(
-                  selectedPlace.domeinen,
-                  72,
-                  "#ffffff",
-                )}
-              </div>
-
-              <!-- Domain Tags List -->
-              <div
-                class="popup-tags"
-                style="display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, auto); grid-auto-columns: 1fr; gap: 6px; flex: 1; min-width: 0;"
-              >
-                {#each [...new Set((selectedPlace.domeinen || "")
-                      .split(";")
-                      .map((d) => d.trim()))] as d}
-                  <!-- svelte-ignore a11y_no_static_element_interactions -->
-                  <span
-                    class="p-tag domain-name-tag"
-                    class:light-up={activeHoveredDomein === d}
-                    style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                      DOMEIN_COLORS.default}"
-                    onmouseenter={() => (activeHoveredDomein = d)}
-                    onmouseleave={() => (activeHoveredDomein = null)}
-                  >
-                    {d.trim()}
-                  </span>
-                {/each}
-              </div>
+            <div class="popup-tags">
+              {#each [...new Set((selectedPlace.domeinen || "")
+                    .split(";")
+                    .map((d) => d.trim()))] as d}
+                <span
+                  class="p-tag domain-name-tag"
+                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
+                    DOMEIN_COLORS.default}"
+                >
+                  {d.trim()}
+                </span>
+              {/each}
             </div>
           </div>
 
@@ -1372,6 +1237,7 @@
         : "Scroll naar informatie"}
       type="button"
     >
+      <i class="ph {isScrolledDown ? 'ph-caret-up' : 'ph-caret-down'}"></i>
     </button>
   </div>
 
@@ -1596,7 +1462,7 @@
     position: sticky;
     top: 0;
     z-index: 2000;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
   }
 
   .top-title {
@@ -1690,21 +1556,27 @@
     }
 
     .fixed-air-popup {
-      top: 80px !important;
+      top: 15px !important;
       right: unset !important;
       left: 50% !important;
       transform: translateX(-50%) !important;
       width: 90% !important;
       max-width: 400px !important;
-      max-height: none !important;
-      border-radius: 8px !important;
+      max-height: calc(100% - 30px) !important;
+      border-radius: 12px !important;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
       border: 1px solid rgba(0, 0, 0, 0.05) !important;
-      overflow-y: hidden !important;
+      overflow-y: auto !important;
+      z-index: 2010 !important;
     }
 
     .sidebar.open {
       transform: translateY(0);
+    }
+
+    .scroll-down-btn {
+      padding-top: 4px;
+      margin-top: -4px;
     }
 
     .mobile-toggle {
@@ -1766,7 +1638,7 @@
 
     .popup-title {
       font-size: 0.9rem !important;
-      line-height: 1.1 !important;
+      line-height: 1.3 !important;
     }
 
     .air-popup {
@@ -1793,30 +1665,32 @@
     }
 
     .popup-info-row {
-      margin-bottom: 0 !important;
+      margin-bottom: 4px !important;
       flex: none !important;
       width: 100% !important;
     }
 
     .popup-info-row .label {
       font-size: 0.6rem !important;
-      margin-bottom: 2px !important;
+      margin-bottom: 4px !important;
+      margin-top: 4px !important;
     }
 
     .popup-tags {
       margin-top: 0 !important;
-      margin-bottom: 2px !important;
+      margin-bottom: 4px !important;
     }
 
     .popup-footer {
       width: 100%;
-      margin-top: 0 !important;
+      margin-top: 4px !important;
       padding-top: 0 !important;
       border-top: none !important;
     }
 
     .popup-link {
       font-size: 10px !important;
+      padding-bottom: 4px !important;
     }
 
     :global(.maplibregl-ctrl-bottom-right) {
@@ -2184,7 +2058,7 @@
     top: 15px;
     right: 15px;
     bottom: auto;
-    width: 400px;
+    width: 300px;
     max-height: calc(100% - 30px);
     background: #ffffff;
     backdrop-filter: blur(12px);
@@ -2296,7 +2170,6 @@
   }
   .domain-name-tag {
     text-align: center;
-    margin: 0 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2743,24 +2616,75 @@
 
   /* Responsive styling to gracefully stack layout on tablets and mobile screens */
   @media (max-width: 900px) {
+    .info-scroll-trigger {
+      display: none !important;
+    }
+
+    .top-title {
+      font-size: 1.15rem !important;
+      margin-left: 36px !important;
+    }
+
     .map-frame {
       flex-direction: column;
-      height: auto;
-      min-height: auto;
-      width: 95%;
-      gap: 16px;
-      margin: 15px auto;
+      height: calc(100dvh - 90px - 60px) !important;
+      min-height: auto !important;
+      width: 95% !important;
+      /* margin: 0 !important;
+      gap: 0 !important;
+      border-radius: 0 !important; */
     }
 
     .sidebar {
-      width: 100% !important;
+      position: absolute !important;
+      top: auto !important;
+      bottom: 12px !important;
+      left: 12px !important;
+      right: 12px !important;
+      width: calc(100% - 24px) !important;
+      height: 5dvh !important;
+      max-height: 50dvh !important;
+      background: #ffffff !important;
+      border-radius: 12px !important;
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+      z-index: 1000 !important;
+      transform: translateY(calc(100% - 50px)) !important;
+      transition: transform 0.33s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    .sidebar.open {
+      transform: translateY(0) !important;
       height: 50dvh !important;
+      transition: all 0.5s ease-in-out;
     }
 
     .map-container {
-      position: relative !important;
+      position: absolute !important;
       width: 100% !important;
-      height: 450px !important;
+      height: 100% !important;
+      top: 0 !important;
+      left: 0 !important;
+    }
+
+    .scroll-down-container {
+      width: 100% !important;
+      height: 60px !important;
+      background: #ffffff !important;
+      /* border-top: 1px solid rgba(0, 0, 0, 0.08) !important; */
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      margin: 0 !important;
+      padding: 0 !important;
+      /* box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.02) !important; */
+      z-index: 100 !important;
+      position: relative !important;
     }
 
     .bottom-info-section {
@@ -2773,7 +2697,7 @@
     .block-waardebloem .waardebloem-content {
       flex-direction: column;
       align-items: center;
-      text-align: center;
+      text-align: left;
       gap: 16px;
     }
 
@@ -2784,6 +2708,10 @@
 
     .header-content {
       width: 95%;
+    }
+
+    .top-header {
+      box-shadow: none;
     }
   }
 
@@ -2859,12 +2787,10 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    border-radius: 50%;
     background: #ffffff;
-    border: none;
     outline: none;
     color: #5d69fb;
-    font-size: 2.5rem;
+    font-size: 1.8rem;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     animation: bounce 2.5s infinite;
@@ -2958,74 +2884,5 @@
     height: 48px;
     width: auto;
     object-fit: contain;
-  }
-
-  /* Interactive Hexagon Triangles & Domain Tags styling */
-  .domains-layout-container :global(.hex-triangle) {
-    transition:
-      transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-      opacity 0.2s ease,
-      filter 0.2s ease;
-    transform-origin: center;
-    cursor: pointer;
-  }
-
-  /* Fade non-hovered/non-matching elements when a domain is active */
-  .domains-layout-container.has-hovered-domain :global(.hex-triangle) {
-    opacity: 0.45;
-  }
-
-  /* Specific domain highlights: enlarge & pop the matching triangle(s) */
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Wonen"]
-    :global(.hex-triangle[data-domain="Wonen"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Welzijn"]
-    :global(.hex-triangle[data-domain="Welzijn"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Cultuur"]
-    :global(.hex-triangle[data-domain="Cultuur"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Klimaat"]
-    :global(.hex-triangle[data-domain="Klimaat"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Voedsel"]
-    :global(.hex-triangle[data-domain="Voedsel"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Groen"]
-    :global(.hex-triangle[data-domain="Groen"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Circulair"]
-    :global(.hex-triangle[data-domain="Circulair"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Mobiliteit"]
-    :global(.hex-triangle[data-domain="Mobiliteit"]),
-  .domains-layout-container.has-hovered-domain
-    .hexagon-container[data-hovered-domain="Energie"]
-    :global(.hex-triangle[data-domain="Energie"]) {
-    transform: scale(1.15);
-    opacity: 1;
-    filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
-  }
-
-  /* Domain tags light-up style */
-  .domain-name-tag {
-    transition:
-      transform 0.2s ease,
-      filter 0.2s ease,
-      box-shadow 0.2s ease !important;
-  }
-  .domain-name-tag.light-up {
-    transform: scale(1.08);
-    filter: brightness(1.1);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
-    z-index: 5;
-  }
-  /* Fade out the outer border polygon when a domain is active */
-  .domains-layout-container :global(polygon) {
-    transition: opacity 0.2s ease;
-  }
-  .domains-layout-container.has-hovered-domain :global(polygon) {
-    opacity: 0;
   }
 </style>
