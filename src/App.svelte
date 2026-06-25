@@ -16,6 +16,7 @@
   let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
+  let activeHoveredDomein = $state(null);
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
   let enlargedImage = $state(null);
@@ -239,6 +240,26 @@
     openSections[name] = !openSections[name];
   }
 
+  let infoSection = $state();
+  let isScrolledDown = $state(false);
+
+  function handleScroll() {
+    isScrolledDown = window.scrollY > 300;
+  }
+
+  function scrollToInfo() {
+    if (infoSection) {
+      const headerHeight = 110; // sticky top-header height + buffer
+      const rect = infoSection.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - headerHeight;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+    }
+  }
+
+  function scrollToMap() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   let selectedGebieden = $state([]);
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
@@ -295,7 +316,6 @@
   }
 
   function activatePlaceOnMap(place) {
-    alert("activatePlaceOnMap called for: " + (place ? place.name : "null"));
     if (activeMarkerElement) {
       activeMarkerElement.classList.remove("active-glow");
     }
@@ -602,6 +622,98 @@
     return parts.join("; ");
   }
 
+  const createPureCircleSVG = (
+    domeinen,
+    size = 48,
+    borderColor = "#000000",
+  ) => {
+    const domeinList = (domeinen || "")
+      .split(";")
+      .map((d) => d.trim())
+      .filter(Boolean);
+
+    // Determine the number of domains.
+    // If 0, fallback to 1 (using default domain color)
+    const N = domeinList.length === 0 ? 1 : Math.min(domeinList.length, 6);
+
+    const colors = [];
+    const names = [];
+
+    if (domeinList.length === 0) {
+      colors.push(DOMEIN_COLORS.default);
+      names.push("default");
+    } else {
+      for (let i = 0; i < N; i++) {
+        const d = domeinList[i];
+        colors.push(DOMEIN_COLORS[d] || DOMEIN_COLORS.default);
+        names.push(d);
+      }
+    }
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const R = size / 2 - 2;
+
+    const getVertices = (numSides, radius) => {
+      const pts = [];
+      const startAngle = numSides === 4 ? -45 : -90; // Align square flat-bottomed, others pointed up
+      for (let i = 0; i < numSides; i++) {
+        const angle_rad = (Math.PI / 180) * ((360 / numSides) * i + startAngle);
+        pts.push({
+          x: cx + radius * Math.cos(angle_rad),
+          y: cy + radius * Math.sin(angle_rad),
+        });
+      }
+      return pts;
+    };
+
+    let trianglesHtml = "";
+    let borderHtml = "";
+
+    if (N === 1) {
+      // 1 domain: just one regular triangle
+      const pts = getVertices(3, R);
+      trianglesHtml = `<path class="hex-triangle" data-domain="${names[0]}" d="M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y} L ${pts[2].x} ${pts[2].y} Z" fill="${colors[0]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[0]}</title></path>`;
+      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
+      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round" />`;
+    } else if (N === 2) {
+      // 2 domains: regular triangle split in two halves
+      const pts = getVertices(3, R);
+      const p0 = pts[0];
+      const p1 = pts[1];
+      const p2 = pts[2];
+      const pmid = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+
+      // Left half (corresponds to names[0]/colors[0])
+      trianglesHtml += `<path class="hex-triangle" data-domain="${names[0]}" d="M ${p0.x} ${p0.y} L ${pmid.x} ${pmid.y} L ${p2.x} ${p2.y} Z" fill="${colors[0]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[0]}</title></path>`;
+
+      // Right half (corresponds to names[1]/colors[1])
+      trianglesHtml += `<path class="hex-triangle" data-domain="${names[1]}" d="M ${p0.x} ${p0.y} L ${p1.x} ${p1.y} L ${pmid.x} ${pmid.y} Z" fill="${colors[1]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[1]}</title></path>`;
+
+      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
+      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" stroke-linejoin="round" />`;
+    } else {
+      // N = 3 (triangle), 4 (square), 5 (pentagon), 6 (hexagon)
+      // all split to the middle into N triangles
+      const pts = getVertices(N, R);
+      for (let i = 0; i < N; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % N];
+        trianglesHtml += `<path class="hex-triangle" data-domain="${names[i]}" d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round"><title>${names[i]}</title></path>`;
+      }
+      const polygonPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
+      borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="1.5" stroke-linejoin="round" />`;
+    }
+
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
+      ${trianglesHtml}
+      ${borderHtml}
+    </svg>`;
+  };
+
   let buurtToFeatureIds = new Map();
 
   $effect(() => {
@@ -683,6 +795,7 @@
       activeMarkerContainer.style.zIndex = "";
     }
     selectedPlace = null;
+    activeHoveredDomein = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
     clickedAreaGebieden = [];
@@ -850,7 +963,6 @@
       }
 
       el.addEventListener("click", (e) => {
-        alert("Marker element click event fired for: " + place.name);
         e.stopPropagation();
         activatePlaceOnMap(place);
       });
@@ -908,11 +1020,21 @@
   });
 </script>
 
+<svelte:window onscroll={handleScroll} />
+
 <div class="layout" onclick={closePopup} role="presentation">
   <!-- Top Header Bar -->
   <header class="top-header">
     <div class="header-content">
-      <h1 class="top-title">IN OPBOUW: Initiatiefkracht in kaart</h1>
+      <h1 class="top-title">IN OPBOUW:<br />INITIATIEFKRACHT IN KAART</h1>
+      <button
+        class="info-scroll-trigger"
+        onclick={isScrolledDown ? scrollToMap : scrollToInfo}
+        type="button"
+      >
+        <span>{isScrolledDown ? "KAART" : "INFORMATIE"}</span>
+        <i class="ph {isScrolledDown ? 'ph-caret-up' : 'ph-caret-down'}"></i>
+      </button>
     </div>
   </header>
 
@@ -1128,9 +1250,9 @@
       >
         <div class="popup-top-bar">
           <h3 class="popup-title">{selectedPlace.name}</h3>
-          <button class="close-btn" onclick={closePopup} aria-label="Sluiten"
-            >×</button
-          >
+          <button class="close-btn" onclick={closePopup} aria-label="Sluiten">
+            <i class="ph ph-x"></i>
+          </button>
         </div>
 
         <div class="air-popup">
@@ -1158,17 +1280,21 @@
             >
               <!-- Hexagon Container -->
               <div
+                role="presentation"
                 style="width: fit-content; padding: 4px; display: flex; align-items: center; justify-content: center;"
                 class="hexagon-container"
-                data-hovered-domain={activeHoveredDomein}
+                data-hovered-domain={activeHoveredDomein || ""}
                 onmouseover={(e) => {
                   const target = e.target.closest(".hex-triangle");
                   if (target) {
                     activeHoveredDomein = target.getAttribute("data-domain");
                   }
                 }}
-                onmouseout={() => {
-                  activeHoveredDomein = null;
+                onmouseout={(e) => {
+                  const toElement = e.relatedTarget;
+                  if (!toElement || !e.currentTarget.contains(toElement)) {
+                    activeHoveredDomein = null;
+                  }
                 }}
               >
                 {@html createPureCircleSVG(
@@ -1181,11 +1307,12 @@
               <!-- Domain Tags List -->
               <div
                 class="popup-tags"
-                style="display: flex; flex-direction: column; gap: 6px;"
+                style="display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, auto); grid-auto-columns: 1fr; gap: 6px; flex: 1; min-width: 0;"
               >
                 {#each [...new Set((selectedPlace.domeinen || "")
                       .split(";")
                       .map((d) => d.trim()))] as d}
+                  <!-- svelte-ignore a11y_no_static_element_interactions -->
                   <span
                     class="p-tag domain-name-tag"
                     class:light-up={activeHoveredDomein === d}
@@ -1224,10 +1351,8 @@
 
           <div class="popup-info-row website-row">
             {#if selectedPlace.website}
-              <a
-                href={selectedPlace.website}
-                target="_blank"
-                class="popup-link">Bezoek website ↗</a
+              <a href={selectedPlace.website} target="_blank" class="popup-link"
+                >Bezoek website ↗</a
               >
             {/if}
           </div>
@@ -1236,13 +1361,28 @@
     {/if}
   </main>
 
+  <!-- Centered Caret Button below the map -->
+  <div class="scroll-down-container">
+    <button
+      class="scroll-down-btn"
+      class:pointing-up={isScrolledDown}
+      onclick={isScrolledDown ? scrollToMap : scrollToInfo}
+      aria-label={isScrolledDown
+        ? "Scroll naar kaart"
+        : "Scroll naar informatie"}
+      type="button"
+    >
+    </button>
+  </div>
+
   <!-- Bottom Info Section -->
-  <section class="bottom-info-section">
-    <div class="info-column block-informatie">
-      <h2>Informatie</h2>
+  <section class="bottom-info-section" bind:this={infoSection}>
+    <!-- Left Column: Waarom deze kaart & Over deze kaart -->
+    <div class="info-column block-left">
+      <h2>INFORMATIE</h2>
 
       <div class="intro-section">
-        <strong>Waarom deze kaart?</strong>
+        <strong>WAAROM DEZE KAART?</strong>
         <p>
           Overal in Rotterdam ontstaan er nieuwe initiatieven waarin mensen en
           gemeenschappen, vaak onder de radar, experimenteren met alternatieven
@@ -1255,7 +1395,7 @@
       </div>
 
       <div class="intro-section">
-        <strong>Over deze kaart</strong>
+        <strong>OVER DEZE KAART</strong>
         <p>
           Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
           verdeeld over verschillende categorieën en domeinen. De kaart is niet
@@ -1267,12 +1407,18 @@
           categorisering om de veelzijdigheid van initiatiefkracht beter
           leesbaar en navigeerbaar te maken. Zo hopen we dat initiatieven,
           organisaties en bewoners elkaar makkelijker kunnen vinden, versterken
-          en ondersteunen. <br /> <br />Hier onder vind je een uitleg van de
-          categorieën en domeinen die we gebruiken om de initiatieven te
-          ordenen.
+          en ondersteunen.
         </p>
       </div>
+    </div>
 
+    <!-- Middle Column: Category List (Plekken, Wijken & Netwerken, Koepels, Domeinen) -->
+    <div class="info-column block-middle">
+      <h2>LEGENDA</h2>
+      <p>
+        Hieronder vind je een uitleg van de categorieën en domeinen die we
+        gebruiken om de initiatieven te ordenen.
+      </p>
       <div class="category-list">
         <div class="category-item">
           <span class="legend-marker legend-marker-point" aria-hidden="true"
@@ -1324,35 +1470,13 @@
           </div>
         </div>
       </div>
-
-      <div class="waardebloem-section">
-        <p class="cta">
-          <strong>Klik op de Waardenbloem</strong>
-          en bekijk hoe de domeinen en categorieën zich tot elkaar verhouden.
-        </p>
-        <button
-          class="waardebloem-icon-btn"
-          onclick={() => (enlargedImage = "Waardebloem.png")}
-          title="Klik om de Waardebloem te vergroten"
-        >
-          <img src="Waardebloem.png" alt="Waardebloem" />
-        </button>
-      </div>
-
-      <div class="accordion-divider"></div>
-      <div class="intro-section partners-logos">
-        <p>Deze kaart is ontwikkeld door AIR, in samenwerking met Groen010.</p>
-        <div class="logos-section">
-          <img src="AIR.png" alt="AIR logo" class="org-logo" />
-          <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
-        </div>
-      </div>
     </div>
 
+    <!-- Bottom Left: Draag bij aan de kaart -->
     <div class="info-column block-contribute">
-      <h2>Draag bij aan de kaart</h2>
+      <h2>DRAAG BIJ AAN DE KAART</h2>
       <p>
-        Heb je opmerkingen over de vermelding van jouw initiatief? Stuur dan een
+        Heb je opmerkingen over de vermelding van een initiatief? Stuur dan een
         email naar <a href="mailto:initiatiefkracht@gmail.com"
           >initiatiefkracht@gmail.com</a
         >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
@@ -1364,7 +1488,41 @@
         > aan!
       </p>
     </div>
+
+    <!-- Bottom Right: De waardenbloem -->
+    <div class="info-column block-waardebloem">
+      <h2>DE WAARDENBLOEM</h2>
+      <div class="waardebloem-content">
+        <p>
+          De waardenbloem illustreert hoe de verschillende domeinen met elkaar
+          verbonden zijn. Klik op de waardenbloem om hem beter te bekijken.
+        </p>
+        <button
+          class="waardebloem-icon-btn"
+          onclick={() => (enlargedImage = "Waardebloem.png")}
+          title="Klik om de Waardebloem te vergroten"
+        >
+          <img src="Waardebloem.png" alt="Waardebloem" />
+        </button>
+      </div>
+    </div>
   </section>
+
+  <!-- Footer with Logos and Credits -->
+  <footer class="bottom-footer">
+    <div class="footer-content">
+      <p>
+        Deze kaart is ontwikkeld door
+        <a href="https://airrotterdam.eu"> AIR </a>, in samenwerking met
+        <a href="https://groen010.nl"> Groen010 </a>.
+      </p>
+
+      <div class="logos-section">
+        <img src="AIR.png" alt="AIR logo" class="org-logo" />
+        <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+      </div>
+    </div>
+  </footer>
 
   <!-- Image zoom modal -->
   {#if enlargedImage}
@@ -1401,6 +1559,8 @@
 </div>
 
 <style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
+
   :global(#app) {
     margin: 0 !important;
     padding: 0 !important;
@@ -1416,6 +1576,7 @@
     min-height: 100%;
     background: #fdfcf7;
     display: block !important;
+    font-family: "Inter", sans-serif;
   }
 
   .layout {
@@ -1431,10 +1592,11 @@
     height: 90px;
     display: flex;
     align-items: center;
-    padding: 0 5%;
+    padding: 0;
     position: sticky;
     top: 0;
     z-index: 2000;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .top-title {
@@ -1445,15 +1607,19 @@
     letter-spacing: 0.5px;
     text-transform: uppercase;
     font-family: inherit;
+    vertical-align: text-bottom;
+    margin-top: 20px;
+    text-align: left;
+    margin-bottom: 3px;
   }
 
   .map-frame {
     position: relative;
-    width: 95%;
-    max-width: 1750px;
+    width: 98%;
+    max-width: 1990px;
     height: 83vh;
     min-height: 600px;
-    margin: 0 auto 30px auto;
+    margin: 0 auto 10px auto;
     overflow: hidden;
     box-sizing: border-box;
   }
@@ -1511,7 +1677,7 @@
       left: 0;
       width: 100%;
       height: 60px;
-      background: #fbf9f9;
+      background: #ffffff;
       color: #5d69fb;
       font-family: inherit;
       font-weight: 900;
@@ -1537,22 +1703,6 @@
       overflow-y: hidden !important;
     }
 
-    .sidebar {
-      position: fixed !important;
-      top: auto !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 50dvh !important;
-      max-height: 50dvh !important;
-      border-radius: 0 !important;
-      border-right: none !important;
-      border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
-      z-index: 2000;
-      transform: translateY(calc(50dvh - 50px));
-      transition: transform 0.3s ease-in-out;
-    }
-
     .sidebar.open {
       transform: translateY(0);
     }
@@ -1563,7 +1713,7 @@
       justify-content: center;
       width: 100%;
       height: 50px;
-      background: #fbf9f9;
+      background: #ffffff;
       border: none;
       border-bottom: 1px solid rgba(0, 0, 0, 0.05);
       font-family: inherit;
@@ -1658,16 +1808,6 @@
       margin-bottom: 2px !important;
     }
 
-    .p-tag {
-      font-size: 8px !important;
-      padding: 2px 4px !important;
-      margin-bottom: 5px !important;
-    }
-
-    .buurt-tag {
-      font-size: 7.5px !important;
-    }
-
     .popup-footer {
       width: 100%;
       margin-top: 0 !important;
@@ -1712,13 +1852,13 @@
     font-size: 1.4rem;
     letter-spacing: -0.5px;
     color: #5d69fb;
-    background-color: #fbf9f9;
+    background-color: #ffffff;
     text-align: center;
   }
   .location-filter {
     padding: 16px 20px;
     border-bottom: 1px solid #e0ddd5;
-    background: #fbf9f9;
+    background: #ffffff;
   }
   .search-group {
     margin-bottom: 12px;
@@ -1778,11 +1918,11 @@
   }
   .accordion {
     border-bottom: 1px solid #e0ddd5;
-    background: #fbf9f9;
+    background: #ffffff;
     transition: background-color 0.2s ease;
   }
   .accordion:has(.accordion-content) {
-    background: #fbf9f9;
+    background: #ffffff;
   }
   .accordion-header {
     width: 100%;
@@ -1839,7 +1979,7 @@
     font-weight: 500;
     cursor: pointer;
     text-align: left;
-    border-radius: 6px;
+    /* border-radius: 6px; */
     transition: all 0.2s ease;
     user-select: none;
   }
@@ -1862,7 +2002,7 @@
     letter-spacing: 0.02rem;
     color: #999;
     font-weight: bold;
-    background: #fbf9f9;
+    background: #ffffff;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
   }
@@ -2044,9 +2184,9 @@
     top: 15px;
     right: 15px;
     bottom: auto;
-    width: 300px;
+    width: 400px;
     max-height: calc(100% - 30px);
-    background: rgba(255, 252, 244, 0.95);
+    background: #ffffff;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 16px;
@@ -2086,12 +2226,12 @@
   .close-btn {
     background: #ffffff;
     border: none;
-    font-size: 22px;
+    font-size: 16px;
     font-family: inherit;
     cursor: pointer;
     color: #5d69fb;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2102,7 +2242,7 @@
     line-height: 0;
   }
   .close-btn:hover {
-    background-color: #fbf9f9;
+    background-color: #ffffff;
     color: #1a1a1a;
   }
   .air-popup {
@@ -2143,16 +2283,26 @@
   }
 
   .p-tag {
-    font-size: 9px;
+    font-size: 10px;
     padding: 3px 6px;
     margin-right: 4px;
     margin-bottom: 4px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     text-transform: uppercase;
     font-weight: bold;
-    color: #fbf9f9;
+    color: #ffffff;
     display: inline-block;
     border-radius: 5px;
+  }
+  .domain-name-tag {
+    text-align: center;
+    margin: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: fit-content;
+    height: fit-content;
   }
   a.p-tag {
     cursor: pointer;
@@ -2164,8 +2314,8 @@
   .buurt-tag {
     background-color: #999;
     color: #fff !important;
-    font-size: 7.5px;
-    padding: 1px 4px;
+    font-size: 10px;
+    padding: 2px 4px;
   }
   .popup-tags {
     display: flex;
@@ -2183,7 +2333,7 @@
   }
   .popup-link:hover {
     color: #5d69fb;
-    background: #fbf9f9;
+    background: #ffffff;
   }
 
   :global(.marker-container) {
@@ -2250,12 +2400,10 @@
     justify-content: center;
     gap: 20px;
     margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #e0ddd5;
   }
 
   .org-logo {
-    height: 50px;
+    height: 80px;
     object-fit: contain;
   }
 
@@ -2326,39 +2474,58 @@
 
   .waardebloem-section {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 16px;
     margin-top: 8px;
     padding-top: 12px;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-top: none;
+    text-align: center;
   }
 
   .waardebloem-icon-btn {
-    width: 60px;
-    height: 60px;
+    width: 200px;
+    height: 200px;
     flex-shrink: 0;
-    padding: 4px;
+    padding: 8px;
     background: white;
-    border: 1px solid #d8d2c8;
-    border-radius: 12px;
     cursor: pointer;
     overflow: hidden;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .waardebloem-icon-btn:hover {
-    border-color: #5d69fb;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(93, 105, 251, 0.1);
+    transform: scale(1.03) translateY(-2px);
   }
 
   .waardebloem-icon-btn img {
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .block-waardebloem .waardebloem-content {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 24px;
+    justify-content: space-between;
+  }
+
+  .block-waardebloem .waardebloem-content p {
+    margin: 0;
+    flex: 1;
+    font-size: 0.95rem;
+    color: #444444;
+  }
+
+  .block-waardebloem .waardebloem-icon-btn {
+    width: 160px;
+    height: 160px;
+    margin-top: -8px;
   }
 
   .reset-button {
@@ -2383,7 +2550,7 @@
     position: sticky;
     bottom: 0;
     z-index: 90;
-    box-shadow: 0 -10px 20px #fbf9f9;
+    box-shadow: 0 -10px 20px #ffffff;
   }
   .reset-button:hover {
     background: #f0edeb;
@@ -2463,6 +2630,7 @@
 
   .intro-section {
     margin-bottom: 8px;
+    text-align: left;
   }
 
   .intro-section strong {
@@ -2480,19 +2648,10 @@
   }
 
   .category-item {
-    background: #ffffff;
-    border: 1px solid #d8d2c8;
-    border-radius: 8px;
     padding: 12px;
     display: flex;
     gap: 14px;
     align-items: center;
-    transition: transform 0.2s ease;
-  }
-
-  .category-item:hover {
-    transform: translateX(4px);
-    border-color: #5d69fb44;
   }
 
   .category-text {
@@ -2501,7 +2660,7 @@
 
   .category-text strong {
     display: block;
-    font-size: 0.75rem;
+    font-size: 0.95rem;
     color: #5d69fb;
     margin-bottom: 2px;
     text-transform: uppercase;
@@ -2511,7 +2670,7 @@
 
   .category-item p {
     margin: 0 !important;
-    font-size: 0.75rem !important;
+    font-size: 0.8rem !important;
   }
 
   .initiatives-intro .cta {
@@ -2529,14 +2688,13 @@
 
   .bottom-info-section {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 40px;
-    width: 90%;
-    max-width: 1400px;
-    margin: 40px auto 80px auto;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    width: 98%;
+    margin: 10px auto 50px auto;
     padding-top: 30px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
     box-sizing: border-box;
+    max-width: 1200px;
   }
 
   .info-column {
@@ -2544,40 +2702,37 @@
     flex-direction: column;
     gap: 24px;
     background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 12px;
     padding: 30px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    font-family: "Helvetica", Arial, sans-serif;
+    font-family: "Inter", sans-serif;
     color: #444444;
     line-height: 1.6;
     box-sizing: border-box;
+    text-align: left;
   }
 
   .info-column h2 {
-    margin: 0 0 10px 0;
-    font-size: 1.6rem;
+    margin: 0 0 6px 0;
+    font-size: 1.8rem;
     color: #333333;
-    font-weight: 700;
-    border-bottom: 2px solid #5d69fb;
-    padding-bottom: 8px;
+    font-weight: 800;
+    padding-bottom: 0px;
     width: fit-content;
   }
 
   .intro-section p {
     font-size: 0.95rem;
-    color: #555555;
+    color: #444444;
   }
 
   .partners-logos {
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-    padding-top: 20px;
-    margin-top: 10px;
+    padding-top: 15px;
   }
 
   .block-contribute p {
-    font-size: 1rem;
+    margin: 0;
+    font-size: 0.95rem;
     color: #555555;
+    text-align: left;
   }
 
   .block-contribute a {
@@ -2614,5 +2769,263 @@
       gap: 24px;
       margin: 20px auto 40px auto;
     }
+
+    .block-waardebloem .waardebloem-content {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 16px;
+    }
+
+    .block-waardebloem .waardebloem-icon-btn {
+      width: 180px;
+      height: 180px;
+    }
+
+    .header-content {
+      width: 95%;
+    }
+  }
+
+  /* Custom styling for scrolling triggers and buttons */
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 98%;
+    max-width: 1990px;
+    margin: 0 auto;
+    gap: 16px;
+  }
+
+  .info-scroll-trigger {
+    display: flex;
+    align-items: right;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #5d69fb;
+    padding: 8px 16px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 50px;
+    margin-bottom: 3px;
+  }
+
+  .info-scroll-trigger:hover {
+    color: #000000;
+  }
+
+  .info-scroll-trigger:focus,
+  .info-scroll-trigger:active,
+  .info-scroll-trigger:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .info-scroll-trigger i {
+    font-size: 1.1rem;
+    transition: transform 0.2s ease;
+  }
+
+  .info-scroll-trigger:hover i.ph-caret-down {
+    transform: translateY(2px);
+  }
+
+  .info-scroll-trigger:hover i.ph-caret-up {
+    transform: translateY(-2px);
+  }
+
+  .scroll-down-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+    margin-bottom: 10px;
+    margin-top: 0px;
+  }
+
+  .scroll-down-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: none;
+    outline: none;
+    color: #5d69fb;
+    font-size: 2.5rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: bounce 2.5s infinite;
+  }
+
+  .scroll-down-btn:hover {
+    color: #000000;
+    transform: translateY(3px);
+    animation-play-state: paused;
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .scroll-down-btn.pointing-up:hover {
+    transform: translateY(-3px);
+  }
+
+  .scroll-down-btn:focus,
+  .scroll-down-btn:active,
+  .scroll-down-btn:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  @keyframes bounce {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-6px);
+    }
+    60% {
+      transform: translateY(-3px);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .info-scroll-trigger span {
+      display: none;
+    }
+    .info-scroll-trigger {
+      padding: 8px;
+      border-radius: 50%;
+      background: rgba(93, 105, 251, 0.05);
+    }
+  }
+
+  /* Footer Styling */
+  .bottom-footer {
+    width: 100%;
+    background: #ffffff;
+    padding: 40px 0;
+    border-top: 1px solid #b1b1b1;
+    width: 60%;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .footer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 98%;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .footer-content p {
+    font-size: 0.95rem;
+    color: #444444;
+    margin: 0;
+    font-family: "Inter", sans-serif;
+  }
+
+  .footer-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+  }
+
+  .footer-logos img {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+  }
+
+  /* Interactive Hexagon Triangles & Domain Tags styling */
+  .domains-layout-container :global(.hex-triangle) {
+    transition:
+      transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity 0.2s ease,
+      filter 0.2s ease;
+    transform-origin: center;
+    cursor: pointer;
+  }
+
+  /* Fade non-hovered/non-matching elements when a domain is active */
+  .domains-layout-container.has-hovered-domain :global(.hex-triangle) {
+    opacity: 0.45;
+  }
+
+  /* Specific domain highlights: enlarge & pop the matching triangle(s) */
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Wonen"]
+    :global(.hex-triangle[data-domain="Wonen"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Welzijn"]
+    :global(.hex-triangle[data-domain="Welzijn"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Cultuur"]
+    :global(.hex-triangle[data-domain="Cultuur"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Klimaat"]
+    :global(.hex-triangle[data-domain="Klimaat"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Voedsel"]
+    :global(.hex-triangle[data-domain="Voedsel"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Groen"]
+    :global(.hex-triangle[data-domain="Groen"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Circulair"]
+    :global(.hex-triangle[data-domain="Circulair"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Mobiliteit"]
+    :global(.hex-triangle[data-domain="Mobiliteit"]),
+  .domains-layout-container.has-hovered-domain
+    .hexagon-container[data-hovered-domain="Energie"]
+    :global(.hex-triangle[data-domain="Energie"]) {
+    transform: scale(1.15);
+    opacity: 1;
+    filter: brightness(1.1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  }
+
+  /* Domain tags light-up style */
+  .domain-name-tag {
+    transition:
+      transform 0.2s ease,
+      filter 0.2s ease,
+      box-shadow 0.2s ease !important;
+  }
+  .domain-name-tag.light-up {
+    transform: scale(1.08);
+    filter: brightness(1.1);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    z-index: 5;
+  }
+  /* Fade out the outer border polygon when a domain is active */
+  .domains-layout-container :global(polygon) {
+    transition: opacity 0.2s ease;
+  }
+  .domains-layout-container.has-hovered-domain :global(polygon) {
+    opacity: 0;
   }
 </style>
