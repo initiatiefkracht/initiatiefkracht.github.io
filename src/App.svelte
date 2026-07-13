@@ -11,11 +11,36 @@
   let markers = [];
   let markerMap = new Map();
   let visualMode = $state("domein");
+  let activeHeatmapDomain = $state(null);
+  let activeChoroplethDomain = $state(null);
   let allGeoFeatures = $state([]);
   let currentOpacities = new Map();
   let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
+  let isSelectingLocation = $state(false);
+  let tempMarker = null;
+  let newInitiative = $state({
+    name: "",
+    latitude: "",
+    longitude: "",
+    gebiedList: [],
+    domeinen: [],
+    website: "",
+    koepels: "",
+    initiatief_type: "plek",
+    location_type: "point",
+  });
+  let formStatusMessage = $state("");
+  let formStatusType = $state("");
+
+  let allPossibleBuurten = $derived(
+    [
+      ...new Set(
+        allGeoFeatures.map((f) => f.properties.buurtnaam).filter(Boolean),
+      ),
+    ].sort(),
+  );
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
   let enlargedImage = $state(null);
@@ -85,7 +110,33 @@
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style: {
+        version: 8,
+        sources: {
+          "satellite-source": {
+            type: "raster",
+            tiles: [
+              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            ],
+            tileSize: 256,
+            attribution:
+              "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+          },
+        },
+        layers: [
+          {
+            id: "satellite-layer",
+            type: "raster",
+            source: "satellite-source",
+            paint: {
+              "raster-saturation": -0.9,
+              // "raster-contrast": -0.2,
+              "raster-brightness-max": 1,
+              "raster-opacity": 0.6,
+            },
+          },
+        ],
+      },
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -103,28 +154,61 @@
       "bottom-right",
     );
 
+    map.on("click", (e) => {
+      if (isSelectingLocation) {
+        const { lng, lat } = e.lngLat;
+        newInitiative.latitude = lat.toFixed(6);
+        newInitiative.longitude = lng.toFixed(6);
+
+        // Auto-detect the neighborhood (gebied) from the clicked point
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: ["buurten-fill"],
+        });
+        if (features.length > 0) {
+          const buurtnaam = features[0].properties.buurtnaam || "";
+          if (buurtnaam) {
+            newInitiative.gebiedList = [buurtnaam];
+          }
+        }
+
+        // Draw/move temporary marker
+        if (tempMarker) {
+          tempMarker.setLngLat([lng, lat]);
+        } else {
+          const el = document.createElement("div");
+          el.className = "temp-marker";
+          el.innerHTML =
+            '<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">' +
+            '<i class="ph ph-plus" style="font-size: 11px; color: #ffffff; font-weight: 900;"></i>' +
+            "</div>";
+          tempMarker = new maplibregl.Marker({ element: el })
+            .setLngLat([lng, lat])
+            .addTo(map);
+        }
+
+        isSelectingLocation = false; // exit selection mode
+      }
+    });
+
     map.on("load", () => {
       map.addSource("rotterdam-buurten", {
         type: "geojson",
         data: geoData,
       });
 
-      map.addLayer(
-        {
-          id: "buurten-fill",
-          type: "fill",
-          source: "rotterdam-buurten",
-          paint: {
-            "fill-color": "#5d69fb",
-            "fill-opacity": [
-              "coalesce",
-              ["feature-state", "highlightOpacity"],
-              0,
-            ],
-          },
+      map.addLayer({
+        id: "buurten-fill",
+        type: "fill",
+        source: "rotterdam-buurten",
+        paint: {
+          "fill-color": "#5d69fb",
+          "fill-opacity": [
+            "coalesce",
+            ["feature-state", "highlightOpacity"],
+            0,
+          ],
         },
-        "watername_ocean",
-      );
+      });
 
       mapLoaded = true;
     });
@@ -137,18 +221,19 @@
   const POINT_ZOOM = 15.5;
   const AREA_ZOOM = 13;
   const LARGE_AREA_ZOOM = 11;
+  const MAX_CHOROPLETH_NEIGHBORHOODS = 15;
 
   const DOMEIN_COLORS = {
-    Wonen: "#ba2585",
-    Welzijn: "#804895",
-    Cultuur: "#3c529e",
-    Klimaat: "#86ccdf",
-    Voedsel: "#78bc84",
-    Groen: "#89c05c",
-    Circulair: "#efb000",
-    Mobiliteit: "#d16c11",
-    Energie: "#af232d",
-    default: "#5d69fb",
+    Wonen: "#FBC4EB",
+    Welzijn: "#FDF4C5",
+    Cultuur: "#FDBFA7",
+    Klimaat: "#A2E8DD",
+    Voedsel: "#D6F5C9",
+    Groen: "#A2DFB0",
+    Circulair: "#FDE5A9",
+    Mobiliteit: "#FDC497",
+    Energie: "#FDB2B5",
+    default: "#C3C6F7",
   };
 
   const DOMEIN_ICONS = {
@@ -690,6 +775,13 @@
           place.gebied = canonicalizeGebiedNames(place.gebied, buurtNameMap);
         });
 
+        const localAdded = JSON.parse(
+          localStorage.getItem("local_initiatives") || "[]",
+        );
+        if (localAdded.length > 0) {
+          allPlaces = [...allPlaces, ...localAdded];
+        }
+
         ensureUniqueCoordinates(allPlaces);
 
         initMap(geoData);
@@ -708,6 +800,153 @@
     activeMarkerElement = null;
     activeMarkerContainer = null;
     clickedAreaGebieden = [];
+  }
+
+  async function saveInitiative() {
+    if (!newInitiative.name.trim()) {
+      formStatusMessage = "Vul a.b.b. de naam in.";
+      formStatusType = "error";
+      return;
+    }
+    if (!newInitiative.latitude || !newInitiative.longitude) {
+      formStatusMessage = "Kies a.b.b. de locatie op de kaart.";
+      formStatusType = "error";
+      return;
+    }
+
+    const nextFid =
+      allPlaces.length > 0
+        ? Math.max(...allPlaces.map((p) => p.fid || 0)) + 1
+        : 1;
+
+    const data = {
+      fid: nextFid,
+      name: newInitiative.name,
+      latitude: parseFloat(newInitiative.latitude),
+      longitude: parseFloat(newInitiative.longitude),
+      gebied: newInitiative.gebiedList.join("; "),
+      domeinen: newInitiative.domeinen.join("; "),
+      website: newInitiative.website,
+      koepels: newInitiative.koepels,
+      initiatief_type: newInitiative.initiatief_type,
+      location_type: newInitiative.location_type,
+    };
+
+    try {
+      const response = await fetch("/api/add-initiative", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        formStatusMessage = "Initiatief succesvol toegevoegd aan de kaart!";
+        formStatusType = "success";
+
+        // Add to local state dynamically
+        allPlaces.push(data);
+
+        // Clear form
+        resetForm();
+      } else {
+        throw new Error(result.error || "Onbekende fout");
+      }
+    } catch (e) {
+      console.warn(
+        "Could not save to CSV backend. Falling back to local storage.",
+        e,
+      );
+      // Fallback: save to state and localStorage (for static production builds)
+      allPlaces.push(data);
+
+      const localAdded = JSON.parse(
+        localStorage.getItem("local_initiatives") || "[]",
+      );
+      localAdded.push(data);
+      localStorage.setItem("local_initiatives", JSON.stringify(localAdded));
+
+      formStatusMessage =
+        "Initiatief toegevoegd aan de kaart in-memory (lokaal opgeslagen).";
+      formStatusType = "success";
+
+      resetForm();
+    }
+  }
+
+  function resetForm() {
+    newInitiative = {
+      name: "",
+      latitude: "",
+      longitude: "",
+      gebiedList: [],
+      domeinen: [],
+      website: "",
+      koepels: "",
+      initiatief_type: "plek",
+      location_type: "point",
+    };
+    if (tempMarker) {
+      tempMarker.remove();
+      tempMarker = null;
+    }
+  }
+
+  function downloadCSV() {
+    const headers = [
+      "fid",
+      "name",
+      "latitude",
+      "longitude",
+      "gebied",
+      "domeinen",
+      "website",
+      "koepels",
+      "initiatief_type",
+      "location_type",
+    ];
+
+    const escapeCSV = (val) => {
+      if (val === null || val === undefined) return "";
+      let str = String(val);
+      if (
+        str.includes(";") ||
+        str.includes('"') ||
+        str.includes("\n") ||
+        str.includes("\r")
+      ) {
+        str = '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    };
+
+    const rows = allPlaces.map((p) =>
+      [
+        p.fid,
+        escapeCSV(p.name),
+        p.latitude,
+        p.longitude,
+        escapeCSV(p.gebied),
+        escapeCSV(p.domeinen),
+        escapeCSV(p.website),
+        escapeCSV(p.koepels),
+        escapeCSV(p.initiatief_type),
+        escapeCSV(p.location_type),
+      ].join(";"),
+    );
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "initiatieven.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   let highlightedFeatureIds = new Set();
@@ -798,8 +1037,57 @@
     opacityAnimationFrame = requestAnimationFrame(animateOpacity);
   });
 
+  function getPieChartSvg(colors) {
+    if (colors.length === 0) {
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block;">
+        <circle cx="50" cy="50" r="50" fill="#5d69fb" />
+      </svg>`;
+    }
+    if (colors.length === 1) {
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block;">
+        <circle cx="50" cy="50" r="50" fill="${colors[0]}" />
+      </svg>`;
+    }
+
+    const r = 50;
+    const cx = 50;
+    const cy = 50;
+    let paths = [];
+    const totalSlices = colors.length;
+
+    let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
+    const anglePerSlice = (2 * Math.PI) / totalSlices;
+
+    for (let i = 0; i < totalSlices; i++) {
+      const startAngle = accumulatedAngle;
+      const endAngle = accumulatedAngle + anglePerSlice;
+      accumulatedAngle = endAngle;
+
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+
+      const largeArcFlag = 0;
+      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+      paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
+    }
+
+    return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; border-radius: 50%;">
+      ${paths.join("")}
+    </svg>`;
+  }
+
   $effect(() => {
     if (!map) return;
+
+    if (activeHeatmapDomain || activeChoroplethDomain) {
+      markers.forEach((m) => m.remove());
+      markers = [];
+      markerMap.clear();
+      return;
+    }
+
     const reversedPlaces = [...filteredPlaces].reverse();
 
     reversedPlaces.forEach((place) => {
@@ -813,24 +1101,28 @@
       if (isArea) el.classList.add("air-area-marker");
       const domeinList = [
         ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
-      ];
+      ].filter(Boolean);
 
-      let iconsHtml = "";
-      domeinList.forEach((d) => {
-        const iconColor = isArea
-          ? "#ffffff"
-          : DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
-        const iconClass = DOMEIN_ICONS[d] || DOMEIN_ICONS.default;
-        iconsHtml += `<i class="ph ${iconClass}" style="color: ${iconColor};"></i>`;
-      });
+      let sliceColors = [];
+      if (visualMode === "domein") {
+        if (domeinList.length === 0) {
+          sliceColors = [DOMEIN_COLORS.default];
+        } else {
+          sliceColors = domeinList.map(
+            (d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default,
+          );
+        }
+      } else {
+        sliceColors = [DOMEIN_COLORS.default];
+      }
 
-      el.innerHTML = iconsHtml;
+      el.innerHTML = getPieChartSvg(sliceColors);
       container.appendChild(el);
 
+      el.style.backgroundColor = "transparent";
+
       if (isArea) {
-        el.style.backgroundColor = "#5d69fb";
         el.style.opacity = "0.55";
-        el.style.borderColor = "#5d69fb80";
         if (visualMode === "gebied") {
           const gebiedKey = place.gebied || "default";
           el.style.borderColor =
@@ -842,7 +1134,7 @@
           el.style.borderColor =
             KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
         } else {
-          el.style.borderColor = "#5d69fb80";
+          el.style.borderColor = "#5d69fb";
         }
         const areaGebieden = (place.gebied || "")
           .split(";")
@@ -866,9 +1158,8 @@
           el.style.borderColor =
             KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
         } else {
-          el.style.borderColor = "#737ac6";
+          el.style.borderColor = "#5d69fb";
         }
-        el.style.backgroundColor = "#ffffff";
       }
 
       el.addEventListener("click", (e) => {
@@ -899,6 +1190,240 @@
     };
   });
 
+  let wasHeatmapActive = false;
+  $effect(() => {
+    const isActive =
+      activeHeatmapDomain !== null || activeChoroplethDomain !== null;
+    if (isActive && !wasHeatmapActive && map) {
+      map.flyTo({
+        center: [4.47, 51.915],
+        zoom: 11.5,
+        essential: true,
+      });
+    }
+    wasHeatmapActive = isActive;
+  });
+
+  $effect(() => {
+    if (!mapLoaded || !map) return;
+
+    if (!activeHeatmapDomain) {
+      if (map.getLayer("heatmap-layer")) {
+        map.removeLayer("heatmap-layer");
+      }
+      if (map.getSource("heatmap-source")) {
+        map.removeSource("heatmap-source");
+      }
+      return;
+    }
+
+    const features = allPlaces
+      .map((place) => {
+        const lon = parseFloat(place.longitude);
+        const lat = parseFloat(place.latitude);
+        if (isNaN(lon) || isNaN(lat)) return null;
+
+        const props = {};
+        const domeinen = (place.domeinen || "")
+          .split(";")
+          .map((d) => d.trim())
+          .filter(Boolean);
+        domeinen.forEach((d) => {
+          props[`is_${d}`] = true;
+        });
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lon, lat],
+          },
+          properties: props,
+        };
+      })
+      .filter(Boolean);
+
+    const geoJson = {
+      type: "FeatureCollection",
+      features,
+    };
+
+    if (!map.getSource("heatmap-source")) {
+      map.addSource("heatmap-source", {
+        type: "geojson",
+        data: geoJson,
+      });
+    } else {
+      map.getSource("heatmap-source").setData(geoJson);
+    }
+
+    const beforeId = map.getLayer("buurten-fill") ? "buurten-fill" : undefined;
+
+    if (!map.getLayer("heatmap-layer")) {
+      map.addLayer(
+        {
+          id: "heatmap-layer",
+          type: "heatmap",
+          source: "heatmap-source",
+          filter: ["has", `is_${activeHeatmapDomain}`],
+          paint: {
+            "heatmap-weight": 1,
+            "heatmap-intensity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0,
+              1,
+              15,
+              3,
+            ],
+            "heatmap-color": [
+              "interpolate",
+              ["linear"],
+              ["heatmap-density"],
+              0,
+              "rgba(0, 0, 255, 0)",
+              0.2,
+              "rgba(0, 0, 255, 0.2)",
+              0.4,
+              "rgba(0, 255, 255, 0.5)",
+              0.6,
+              "rgba(0, 255, 0, 0.6)",
+              0.8,
+              "rgba(255, 255, 0, 0.7)",
+              1.0,
+              "rgba(255, 0, 0, 0.8)",
+            ],
+            "heatmap-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0,
+              2,
+              9,
+              15,
+              15,
+              35,
+            ],
+            "heatmap-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              13,
+              0.75,
+              15,
+              0.4,
+              17,
+              0,
+            ],
+          },
+        },
+        beforeId,
+      );
+    } else {
+      map.setFilter("heatmap-layer", ["has", `is_${activeHeatmapDomain}`]);
+    }
+
+    return () => {
+      if (map && map.getLayer("heatmap-layer")) {
+        map.removeLayer("heatmap-layer");
+      }
+      if (map && map.getSource("heatmap-source")) {
+        map.removeSource("heatmap-source");
+      }
+    };
+  });
+
+  $effect(() => {
+    if (!mapLoaded || !map) return;
+
+    const counts = new Map();
+    if (activeChoroplethDomain) {
+      allPlaces.forEach((place) => {
+        const domeinen = (place.domeinen || "")
+          .split(";")
+          .map((d) => d.trim())
+          .filter(Boolean);
+        if (domeinen.includes(activeChoroplethDomain)) {
+          const gebieden = (place.gebied || "")
+            .split(";")
+            .map((g) => g.trim())
+            .filter(Boolean);
+          if (gebieden.length <= MAX_CHOROPLETH_NEIGHBORHOODS) {
+            gebieden.forEach((buurt) => {
+              counts.set(buurt, (counts.get(buurt) || 0) + 1);
+            });
+          }
+        }
+      });
+    }
+
+    allGeoFeatures.forEach((feature) => {
+      const name = feature.properties.buurtnaam;
+      const count = name ? counts.get(name) || 0 : 0;
+      map.setFeatureState(
+        { source: "rotterdam-buurten", id: feature.id },
+        { choroplethCount: count },
+      );
+    });
+
+    if (activeChoroplethDomain) {
+      const color =
+        DOMEIN_COLORS[activeChoroplethDomain] || DOMEIN_COLORS.default;
+      map.setPaintProperty("buurten-fill", "fill-color", color);
+      map.setPaintProperty(
+        "buurten-fill",
+        "fill-opacity",
+        globalMaxCount > 1
+          ? [
+              "interpolate",
+              ["linear"],
+              ["sqrt", ["coalesce", ["feature-state", "choroplethCount"], 0]],
+              0,
+              0,
+              1,
+              0.2,
+              Math.sqrt(globalMaxCount),
+              0.85,
+            ]
+          : [
+              "interpolate",
+              ["linear"],
+              ["coalesce", ["feature-state", "choroplethCount"], 0],
+              0,
+              0,
+              1,
+              0.5,
+            ],
+      );
+    } else {
+      map.setPaintProperty("buurten-fill", "fill-color", "#5d69fb");
+      map.setPaintProperty("buurten-fill", "fill-opacity", [
+        "coalesce",
+        ["feature-state", "highlightOpacity"],
+        0,
+      ]);
+    }
+
+    return () => {
+      if (map) {
+        allGeoFeatures.forEach((feature) => {
+          map.setFeatureState(
+            { source: "rotterdam-buurten", id: feature.id },
+            { choroplethCount: 0 },
+          );
+        });
+        if (map.getLayer("buurten-fill")) {
+          map.setPaintProperty("buurten-fill", "fill-color", "#5d69fb");
+          map.setPaintProperty("buurten-fill", "fill-opacity", [
+            "coalesce",
+            ["feature-state", "highlightOpacity"],
+            0,
+          ]);
+        }
+      }
+    };
+  });
+
   function toggleFilter(list, value) {
     if (list.includes(value)) return list.filter((i) => i !== value);
     return [...list, value];
@@ -926,6 +1451,35 @@
       }
     });
     return [...gebieden].sort();
+  });
+
+  let globalMaxCount = $derived.by(() => {
+    let max = 1;
+    const domains = Object.keys(DOMEIN_COLORS).filter((d) => d !== "default");
+    domains.forEach((domain) => {
+      const counts = new Map();
+      allPlaces.forEach((place) => {
+        const domeinen = (place.domeinen || "")
+          .split(";")
+          .map((d) => d.trim())
+          .filter(Boolean);
+        if (domeinen.includes(domain)) {
+          const gebieden = (place.gebied || "")
+            .split(";")
+            .map((g) => g.trim())
+            .filter(Boolean);
+          if (gebieden.length <= MAX_CHOROPLETH_NEIGHBORHOODS) {
+            gebieden.forEach((buurt) => {
+              counts.set(buurt, (counts.get(buurt) || 0) + 1);
+            });
+          }
+        }
+      });
+      counts.forEach((c) => {
+        if (c > max) max = c;
+      });
+    });
+    return max;
   });
 </script>
 
@@ -1019,25 +1573,71 @@
           </button>
           {#if openSections.domein}
             <div class="accordion-content">
-              {#each uniqueDomeinen as domein}
-                <label class="filter-item">
+              <div class="visual-toggle-container">
+                <span class="toggle-text">Toon kleuren per domein</span>
+                <label class="switch">
                   <input
                     type="checkbox"
-                    checked={selectedDomeinen.includes(domein)}
-                    onchange={() =>
-                      (selectedDomeinen = toggleFilter(
-                        selectedDomeinen,
-                        domein,
-                      ))}
+                    checked={visualMode === "domein"}
+                    onchange={() => handleVisualToggle("domein")}
                   />
-                  <span class="filter-text">{domein}</span>
-                  <i
-                    class="ph {DOMEIN_ICONS[domein] ||
-                      DOMEIN_ICONS.default} sidebar-icon"
-                    style="color: {DOMEIN_COLORS[domein] ||
-                      DOMEIN_COLORS.default}"
-                  ></i>
+                  <span class="slider"></span>
                 </label>
+              </div>
+              <hr class="separator" />
+              {#each uniqueDomeinen as domein}
+                <div class="filter-item-row">
+                  <label class="filter-item" style="flex: 1; margin: 0;">
+                    <input
+                      type="checkbox"
+                      checked={selectedDomeinen.includes(domein)}
+                      onchange={() =>
+                        (selectedDomeinen = toggleFilter(
+                          selectedDomeinen,
+                          domein,
+                        ))}
+                    />
+                    <span class="filter-text">{domein}</span>
+                    <i
+                      class="ph {DOMEIN_ICONS[domein] ||
+                        DOMEIN_ICONS.default} sidebar-icon"
+                      style="color: {DOMEIN_COLORS[domein] ||
+                        DOMEIN_COLORS.default}"
+                    ></i>
+                  </label>
+                  <button
+                    class="heatmap-toggle-btn"
+                    class:active={activeHeatmapDomain === domein}
+                    onclick={() => {
+                      if (activeHeatmapDomain === domein) {
+                        activeHeatmapDomain = null;
+                      } else {
+                        activeHeatmapDomain = domein;
+                        activeChoroplethDomain = null;
+                      }
+                    }}
+                    title="Toon heatmap voor dit domein"
+                    type="button"
+                  >
+                    <i class="ph ph-fire"></i>
+                  </button>
+                  <button
+                    class="choropleth-toggle-btn"
+                    class:active={activeChoroplethDomain === domein}
+                    onclick={() => {
+                      if (activeChoroplethDomain === domein) {
+                        activeChoroplethDomain = null;
+                      } else {
+                        activeChoroplethDomain = domein;
+                        activeHeatmapDomain = null;
+                      }
+                    }}
+                    title="Toon choropletenkaart voor dit domein"
+                    type="button"
+                  >
+                    <i class="ph ph-map-trifold"></i>
+                  </button>
+                </div>
               {/each}
             </div>
           {/if}
@@ -1147,7 +1747,11 @@
     </aside>
 
     <!-- Map Container -->
-    <div class="map-container" bind:this={mapContainer}>
+    <div
+      class="map-container"
+      class:selecting-location={isSelectingLocation}
+      bind:this={mapContainer}
+    >
       {#if !isMobile && showQrBlock}{/if}
     </div>
 
@@ -1353,12 +1957,7 @@
         email naar <a href="mailto:initiatiefkracht@gmail.com"
           >initiatiefkracht@gmail.com</a
         >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
-        initiatief
-        <a
-          href="https://forms.gle/2L41WPykgQH5QRAY7"
-          target="_blank"
-          rel="noopener noreferrer">hier</a
-        > aan!
+        initiatief aan via het formulier hieronder!
       </p>
     </div>
 
@@ -1377,6 +1976,189 @@
         >
           <img src="Waardebloem.png" alt="Waardebloem" />
         </button>
+      </div>
+    </div>
+
+    <!-- Full Width: Add Initiative Form -->
+    <div class="info-column block-add-initiative-full">
+      <div
+        class="add-initiative-form"
+        style="margin-top: 0; padding-top: 0; border-top: none;"
+      >
+        <h3>Nieuw initiatief toevoegen</h3>
+
+        {#if formStatusMessage}
+          <div class="form-status-alert {formStatusType}">
+            <p>{formStatusMessage}</p>
+          </div>
+        {/if}
+
+        <div class="form-group">
+          <label for="init-name">Naam initiatief *</label>
+          <input
+            id="init-name"
+            type="text"
+            bind:value={newInitiative.name}
+            placeholder="Bijv. Buurttuin De Groene Oase"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-half">
+            <label>Locatie selecteren *</label>
+            <button
+              type="button"
+              class="btn-select-location {isSelectingLocation ? 'active' : ''}"
+              onclick={() => {
+                isSelectingLocation = !isSelectingLocation;
+                if (isSelectingLocation && mapContainer) {
+                  mapContainer.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+                }
+              }}
+            >
+              <i
+                class="ph {isSelectingLocation
+                  ? 'ph-cursor-click'
+                  : 'ph-map-pin'}"
+              ></i>
+              {isSelectingLocation
+                ? "Klik nu op de kaart..."
+                : "Kies locatie op kaart"}
+            </button>
+          </div>
+
+          <div class="form-group col-half">
+            <label
+              >Gebied (Buurten) <span
+                style="font-size: 0.72rem; font-weight: normal; color: #666;"
+                >(vink één of meer aan)</span
+              ></label
+            >
+            <div class="buurten-checkbox-list">
+              {#each allPossibleBuurten as buurt}
+                <label class="buurt-checkbox-label">
+                  <input
+                    type="checkbox"
+                    value={buurt}
+                    checked={newInitiative.gebiedList.includes(buurt)}
+                    onchange={(e) => {
+                      if (e.target.checked) {
+                        newInitiative.gebiedList = [
+                          ...newInitiative.gebiedList,
+                          buurt,
+                        ];
+                      } else {
+                        newInitiative.gebiedList =
+                          newInitiative.gebiedList.filter((b) => b !== buurt);
+                      }
+                    }}
+                  />
+                  <span>{buurt}</span>
+                </label>
+              {/each}
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Domeinen (kies één of meer)</label>
+          <div class="domeinen-grid">
+            {#each Object.keys(DOMEIN_COLORS).filter((d) => d !== "default") as domain}
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  value={domain}
+                  checked={newInitiative.domeinen.includes(domain)}
+                  onchange={(e) => {
+                    if (e.target.checked) {
+                      newInitiative.domeinen = [
+                        ...newInitiative.domeinen,
+                        domain,
+                      ];
+                    } else {
+                      newInitiative.domeinen = newInitiative.domeinen.filter(
+                        (d) => d !== domain,
+                      );
+                    }
+                  }}
+                />
+                <span
+                  class="domain-tag-indicator"
+                  style="border-color: {DOMEIN_COLORS[
+                    domain
+                  ]}33; background-color: {newInitiative.domeinen.includes(
+                    domain,
+                  )
+                    ? DOMEIN_COLORS[domain] + '33'
+                    : '#f5f5f5'}; color: {newInitiative.domeinen.includes(
+                    domain,
+                  )
+                    ? '#111111'
+                    : '#666666'}; border: 1px solid {newInitiative.domeinen.includes(
+                    domain,
+                  )
+                    ? DOMEIN_COLORS[domain]
+                    : 'transparent'}"
+                >
+                  {domain}
+                </span>
+              </label>
+            {/each}
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-half">
+            <label for="init-website">Website URL</label>
+            <input
+              id="init-website"
+              type="url"
+              bind:value={newInitiative.website}
+              placeholder="https://example.com"
+            />
+          </div>
+          <div class="form-group col-half">
+            <label for="init-koepels">Koepels (Netwerk)</label>
+            <input
+              id="init-koepels"
+              type="text"
+              bind:value={newInitiative.koepels}
+              placeholder="Bijv. Groen010"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-half">
+            <label for="init-type">Initiatief Type</label>
+            <select id="init-type" bind:value={newInitiative.initiatief_type}>
+              <option value="plek">plek</option>
+              <option value="netwerk">netwerk</option>
+              <option value="wijk">wijk</option>
+            </select>
+          </div>
+          <div class="form-group col-half">
+            <label for="init-loc-type">Locatie Type</label>
+            <select id="init-loc-type" bind:value={newInitiative.location_type}>
+              <option value="point">point</option>
+              <option value="area">area</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="btn-save"
+            style="flex: 1;"
+            onclick={saveInitiative}
+          >
+            <i class="ph ph-plus-circle"></i> Toevoegen aan de kaart
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -1851,6 +2633,57 @@
     border: none;
   }
 
+  .filter-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 4px;
+  }
+  .heatmap-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    color: #9ca3af;
+    flex-shrink: 0;
+  }
+  .heatmap-toggle-btn:hover {
+    background-color: rgba(93, 105, 251, 0.08);
+    color: #4b5563;
+  }
+  .heatmap-toggle-btn.active {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .choropleth-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    color: #9ca3af;
+    flex-shrink: 0;
+  }
+  .choropleth-toggle-btn:hover {
+    background-color: rgba(93, 105, 251, 0.08);
+    color: #4b5563;
+  }
+  .choropleth-toggle-btn.active {
+    background-color: rgba(93, 105, 251, 0.1);
+    color: #5d69fb;
+  }
+
   .filter-item {
     display: flex;
     align-items: center;
@@ -2062,6 +2895,10 @@
     box-sizing: border-box;
   }
 
+  .map-container.selecting-location :global(.maplibregl-canvas) {
+    cursor: crosshair !important;
+  }
+
   .fixed-air-popup {
     position: absolute;
     top: 15px;
@@ -2226,18 +3063,19 @@
   }
 
   :global(.air-marker) {
-    min-width: 26px;
-    height: 26px;
-    border: 2px solid #737ac6;
-    border-radius: 13px;
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-    background: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 0 4px;
+    padding: 0;
+    overflow: hidden;
     box-sizing: border-box;
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
@@ -2246,36 +3084,38 @@
   }
 
   :global(.air-marker i) {
-    font-size: 14px;
+    font-size: 11px;
     line-height: 1;
   }
 
   :global(.marker-container:hover .air-marker) {
     transform: scale(1.3);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   }
 
   :global(.air-marker.active-glow) {
-    border: 2.5px solid #5d69fb;
+    border: 2px solid #6458f5;
     box-shadow:
-      0 0 0 3px #5d69fb33,
-      0 0 15px 8px rgba(132, 80, 255, 0.15),
+      0 0 0 3px rgba(100, 88, 245, 0.25),
+      0 0 12px 6px rgba(100, 88, 245, 0.2),
       0 2px 6px rgba(0, 0, 0, 0.2);
-    transform: scale(1.1);
+    transform: scale(1.15);
   }
 
   :global(.air-area-marker) {
     /* border: 2px solid #ffffff; */
     box-shadow:
-      0 0 0 3px #5d69fb90,
-      0 0 15px 8px rgba(132, 80, 255, 0.1),
-      0 2px 6px rgba(0, 0, 0, 0.2);
-    min-width: 24px;
-    height: 24px;
+      0 0 0 2px rgba(255, 255, 255, 0.4),
+      0 0 12px 6px rgba(100, 88, 245, 0.1),
+      0 2px 5px rgba(0, 0, 0, 0.2);
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 50%;
   }
 
   :global(.air-area-marker i) {
-    font-size: 12px;
+    font-size: 10px;
   }
   .logos-section {
     display: flex;
@@ -2623,6 +3463,266 @@
     font-weight: 600;
   }
 
+  .block-add-initiative-full {
+    grid-column: span 2;
+    margin-top: 20px;
+    padding-top: 25px;
+    border-top: 1px solid #e5e5e5;
+  }
+
+  .add-initiative-form {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 1px solid #e5e5e5;
+    font-family: "Inter", sans-serif;
+  }
+
+  .add-initiative-form h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.3rem;
+    color: #333333;
+    font-weight: 700;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 0;
+  }
+
+  .col-half {
+    flex: 1;
+  }
+
+  .form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #555555;
+  }
+
+  .form-group input,
+  .form-group select {
+    padding: 10px 12px;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: #ffffff;
+    color: #333333;
+    font-family: inherit;
+    box-sizing: border-box;
+    width: 100%;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .form-group input[readonly] {
+    background-color: #f5f5f5;
+    color: #777777;
+    cursor: not-allowed;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #5d69fb;
+    box-shadow: 0 0 0 3px rgba(93, 105, 251, 0.15);
+  }
+
+  .btn-select-location {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1.5px dashed #5d69fb;
+    background-color: rgba(93, 105, 251, 0.04);
+    color: #5d69fb;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-sizing: border-box;
+    width: 100%;
+    transition:
+      background-color 0.2s,
+      border-style 0.2s,
+      transform 0.1s;
+  }
+
+  .btn-select-location:hover {
+    background-color: rgba(93, 105, 251, 0.08);
+  }
+
+  .btn-select-location.active {
+    border-style: solid;
+    background-color: #5d69fb;
+    color: #ffffff;
+    animation: pulse-border 1.5s infinite alternate;
+  }
+
+  @keyframes pulse-border {
+    from {
+      box-shadow: 0 0 0 0px rgba(93, 105, 251, 0.4);
+    }
+    to {
+      box-shadow: 0 0 0 8px rgba(93, 105, 251, 0);
+    }
+  }
+
+  .domeinen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-label input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+
+  .domain-tag-indicator {
+    display: block;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+    color: #444444;
+    transition: all 0.2s;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-save,
+  .btn-download {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition:
+      background-color 0.2s,
+      transform 0.1s;
+  }
+
+  .btn-save {
+    flex: 2;
+    background-color: #48b87c;
+    color: #ffffff;
+  }
+
+  .btn-save:hover {
+    background-color: #3ca36b;
+  }
+
+  .btn-save:active,
+  .btn-download:active {
+    transform: scale(0.98);
+  }
+
+  .btn-download {
+    flex: 1;
+    background-color: #f0f0f0;
+    color: #333333;
+    border: 1px solid #cccccc;
+  }
+
+  .btn-download:hover {
+    background-color: #e5e5e5;
+  }
+
+  .form-status-alert {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .form-status-alert.error {
+    background-color: #fde8e8;
+    color: #9b1c1c;
+    border-left: 4px solid #f05252;
+  }
+
+  .form-status-alert.success {
+    background-color: #edfbf7;
+    color: #03543f;
+    border-left: 4px solid #0e9f6e;
+  }
+
+  .form-status-alert p {
+    margin: 0 !important;
+  }
+
+  :global(.temp-marker) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .buurten-checkbox-list {
+    max-height: 120px;
+    overflow-y: auto;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .buurt-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: #444444;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .buurt-checkbox-label input[type="checkbox"] {
+    width: auto !important;
+    margin: 0;
+    cursor: pointer;
+  }
+
   /* Responsive styling to gracefully stack layout on tablets and mobile screens */
   @media (max-width: 900px) {
     .info-scroll-trigger {
@@ -2754,6 +3854,12 @@
       width: 95%;
       gap: 24px;
       margin: 20px auto 40px auto;
+    }
+
+    .block-add-initiative-full {
+      grid-column: span 1 !important;
+      border-top: 1px solid #e5e5e5;
+      padding-top: 20px;
     }
 
     .block-waardebloem .waardebloem-content {

@@ -125,7 +125,6 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 131;Vredestuin Centrum;51.92541667;4.480444444;Stadsdriehoek;Groen;www.groengoedrotterdam.com;;plek;point
 132;Van Swietenhof;51.886087;4.485587;Carnisse;Groen;https://nl-nl.facebook.com/vanswietenhof/;;plek;point
 133;Katendrechtse Lagedijkplein;51.890595;4.478642;Carnisse;Groen;;;plek;point
-134;Amelandseplein zelfbeheer;51.888188;4.483843;Carnisse;Groen;https://www.ad.nl/rotterdam/plantenbieb-op-het-amelandseplein-mag-toch-blijven~a819a5d3/?referrer=https%3A%2F%2Fwww.google.com%2F;;plek;point
 135;Groene Oase op Zuid;51.885505;4.481273;Carnisse;Groen;https://www.degroeneoaseopzuid.nl/;;plek;point
 136;'t O-tje;51.88597222;4.462083333;Charlois;Groen;https://hetotje.nl/;;plek;point
 137;Binnentuinvereniging Het Verborgen Geheim;51.89181291;4.419027467;Heijplaat;Groen;https://www.facebook.com/binnentuinhvg/;;plek;point
@@ -223,7 +222,6 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 235;Klimaatplein Maasboulevard;51.91891667;4.507333333;Struisenburg;Groen;Eric van Ulden vanuit STEK de stadstuinwinkel  ;;plek;point
 236;Dakgaard;51.92680556;4.479083333;Agniesebuurt;Groen;https://rotterdamseparken.nl/site/parken/station-hofplein-dakgaard/  of https://rotterdamsmilieucentrum.nl/2017/02/08/groen-op-het-spoor-dakgaard-op-een-treinstation/;;plek;point
 237;ZOHO Regentuin Vijverhofstraat;51.928302;4.478748;Agniesebuurt;Groen;https://rotterdamsweerwoord.nl/plekken/regentuin-zoho/;;plek;point
-238;Banierhof zelfbeheer;51.93091667;4.471277778;Agniesenbuurt;Groen;https://twitter.com/IBalkema/status/1392554738743451650;;plek;point
 239;Zoho tuin;51.92948511;4.479117103;Agniessebuurt;Groen;;;plek;point
 240;Tuin van de Wijk Ammerooiseplein;51.930037;4.474772;Agniessebuurt;Groen;https://rotterdamsweerwoord.nl/weerberichten/opening-tuinvandewijk-ammersooiseplein/;;plek;point
 241;Helend Hof;51.93035;4.471980114;Agniessebuurt;Groen;;;plek;point
@@ -238,7 +236,6 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 250;Pluspunt Buurttuin;51.93361111;4.460694444;Blijdorp;Groen;www.pluspuntrotterdam.info;;plek;point
 251;Waelheul - collectieve binnentuin;51.93066667;4.46825;Blijdorp;Groen;http://platformbinnentuinen.nl/tuinen/waelheul/;;plek;point
 252;Gordelwegtuinen;51.93511111;4.456027778;Blijdorp;Groen;http://gordelwegtuinen.nl/;;plek;point
-253;Schepenstraat zelfbeheer;51.92747222;4.463277778;Blijdorp;Groen;https://schepenstraat.info/;;plek;point
 254;de Eendracht - Binnenhof Woongebouw;51.93269444;4.454944444;Blijdorp;Groen;https://rijksmonumenten.nl/monument/524318/woningcomplex-de-eendracht/rotterdam/;;plek;point
 256;Eeuwige Moes;51.92894444;4.456305556;Blijdorp;Groen;https://www.facebook.com/Eeuwige-Moes-Rotterdam-106228127615947/;;plek;point
 257;Daltonveld;51.93136111;4.448861111;Blijdorpse Polder;Groen;https://blijdorpnieuws.nl/het-daltonveld/;;plek;point
@@ -289,3 +286,4 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 302;Taka Tuka Tuin (Wollefoppengroen);51.9675;4.5695;Zevenkamp;Groen;https://www.wollefoppengroen.nl/contact/;;plek;point
 303;Rozenburg Dorpstuin;51.91325;4.229166667;Rozenburg;Groen;http://www.dorpstuinrozenburg.nl/;;plek;point
 305;Voedselbos Vlaardingen;51.90644;4.308109;Westwijk;Groen;https://www.voedselbosvlaardingen.nl/;;plek;point
+306;Textielatelier Katendrecht;51.900761;4.482784;Katendrecht;Circulair;https://www.instagram.com/textielatelierkatendrecht/;;plek;point
