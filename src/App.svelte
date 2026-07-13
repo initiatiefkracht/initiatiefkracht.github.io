@@ -227,7 +227,7 @@
       });
     }
 
-    const R = 8; // Radius
+    const R = 10; // Radius
     const cx = 13;
     const cy = 13;
 

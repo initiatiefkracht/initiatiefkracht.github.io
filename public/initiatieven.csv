@@ -17,7 +17,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 16;Doorgeefwinkel GoedGoed;51.911343304897;4.44283370294243;"Bospolder; Tussendijken";Circulair;https://zwerfierotterdam.nl/2024/10/26/zwerfie-opent-doorgeefwinkel-goedgoed/;Rotterdam Circulair;plek;point
 17;Huis van de Toekomst BoTu;51.9124138035445;4.44286586106206;"Bospolder; Tussendijken";"Energie; Wonen; Welzijn";https://www.huisvandetoekomst.org/;Energie van Rotterdam;plek;point
 19;Stichting Open Haard;51.9159581252949;4.43812770813124;Spangen;Welzijn;https://stichtingopenhaard.nl;;plek;point
-20;Bouwkeet;51.9116395409823;4.43765420012976;Delfshaven;Cultuur;https://bouwkeet.org/;;plek;point
+20;Bouwkeet;51.9116395409823;4.43765420012976;Delfshaven;"Cultuur; Circulair; Welzijn";https://bouwkeet.org/;;plek;point
 21;Speel-o-theek Klein Duimpje;51.9107541970484;4.44470405033789;"Bospolder; Tussendijken";Circulair;https://delfshavenlokaal.nl/;Rotterdam Circulair;plek;point
 22;Stichting de Veerkrachtige Gemeenschap;51.909274257306;4.44418863412528;"Bospolder; Tussendijken";Welzijn;https://veerkrachtigegemeenschap.org/;Welzijnscoalitie Delfshaven;plek;point
 23;Opknapstation;51.9142548264782;4.42212373229032;Oud Mathenesse;Circulair;https://rotterdamcirculair.nl/agenda/opknapstation-naaicafe;Rotterdam Circulair;plek;point
@@ -141,7 +141,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 147;Tiny House Community de Kleine Burg;51.87309;4.50361;Zuiderpark;Groen;www.dekleineburg.nl;;plek;point
 148;Veldentuin of Bornerveldtuin;51.871515;4.482882;Zuidwijk Slinge;Groen;https://www.skar-ateliers.nl/locaties/bornerveld/;;plek;point
 150;Stadsherder (bij Buurttuin);51.90675;4.441722222;Bospolder;Groen;https://www.facebook.com/lorenzo.bertolotto.5;;plek;point
-151;Huis van de toekomst binnentuin;51.91201518;4.442942173;Bospolder;Groen;https://www.huisvandetoekomst.org/;;plek;point
+151;Huis van de toekomst binnentuin;51.91201518;4.442942173;Bospolder;"Groen; Welzijn; Cultuur";https://www.huisvandetoekomst.org/;;plek;point
 152;Bollenpandje Buitenboel;51.90930556;4.44425;"Bospolder; Tussendijken";Groen;https://nl-nl.facebook.com/HetBollenpandjeBoTu/;;plek;point
 153;Park 1943 - actieve bewoners;51.91297222;4.439444444;"Bospolder; Tussendijken";Groen;www.delfshavencooperatie.nl/park-1943;;plek;point
 154;De Nieuwe Tuin;51.90827778;4.460944444;Delfshaven;Groen;www.facebook.com/DeNieuweTuinRotterdam;;plek;point
