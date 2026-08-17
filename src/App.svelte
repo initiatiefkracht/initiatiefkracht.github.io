@@ -224,16 +224,16 @@
   const MAX_CHOROPLETH_NEIGHBORHOODS = 15;
 
   const DOMEIN_COLORS = {
-    Wonen: "#FBC4EB",
+    Wonen: "#f1c5de",
     Welzijn: "#FDF4C5",
-    Cultuur: "#FDBFA7",
+    Cultuur: "#f6b3a9",
     Klimaat: "#A2E8DD",
-    Voedsel: "#D6F5C9",
-    Groen: "#A2DFB0",
-    Circulair: "#FDE5A9",
-    Mobiliteit: "#FDC497",
-    Energie: "#FDB2B5",
-    default: "#C3C6F7",
+    Voedsel: "#6cb85e",
+    Groen: "#a5d2ac",
+    Circulair: "#fdc75a",
+    Mobiliteit: "#dd8787",
+    Energie: "#fbdbdf",
+    default: "#c3c4e4",
   };
 
   const DOMEIN_ICONS = {
@@ -3063,10 +3063,10 @@
   }
 
   :global(.air-marker) {
-    width: 16px;
-    min-width: 16px;
-    height: 16px;
-    border: 2px solid #ffffff;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    border: 3px solid #ffffff;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
