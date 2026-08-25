@@ -10,7 +10,7 @@
   let allPlaces = $state([]);
   let markers = [];
   let markerMap = new Map();
-  let visualMode = $state("domein");
+  let visualMode = $state("default");
   let activeHeatmapDomain = $state(null);
   let activeChoroplethDomain = $state(null);
   let allGeoFeatures = $state([]);
@@ -18,6 +18,7 @@
   let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
+  let hoveredSliceDomain = $state(null);
   let isSelectingLocation = $state(false);
   let tempMarker = null;
   let newInitiative = $state({
@@ -212,6 +213,31 @@
 
       mapLoaded = true;
     });
+
+    let currentMarkerSize = null;
+    const handleZoom = () => {
+      const zoom = map.getZoom();
+      let size = 20;
+      if (zoom < 12.5) {
+        size = 10 + Math.max(0, zoom - 9.5) * (10 / 3.0);
+        size = Math.min(20, Math.max(10, size));
+      }
+      const roundedSize = Math.round(size);
+      if (roundedSize !== currentMarkerSize) {
+        currentMarkerSize = roundedSize;
+        const borderWidth = (1 + (roundedSize - 10) * 0.2).toFixed(1);
+        if (mapContainer) {
+          mapContainer.style.setProperty("--marker-size", `${roundedSize}px`);
+          mapContainer.style.setProperty(
+            "--marker-border-width",
+            `${borderWidth}px`,
+          );
+        }
+      }
+    };
+    map.on("zoom", handleZoom);
+    map.on("load", handleZoom);
+    handleZoom();
   }
 
   function handleVisualToggle(mode) {
@@ -368,7 +394,7 @@
     selectedKoepels = [];
     selectedGebieden = [];
     locationFilterMode = "all";
-    visualMode = "domein";
+    visualMode = "default";
   }
 
   function handleSearchKeyDown(e) {
@@ -408,6 +434,7 @@
     }
 
     selectedPlace = place;
+    hoveredSliceDomain = null;
     if (isMobile) {
       mobileSidebarOpen = false;
     }
@@ -797,6 +824,7 @@
       activeMarkerContainer.style.zIndex = "";
     }
     selectedPlace = null;
+    hoveredSliceDomain = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
     clickedAreaGebieden = [];
@@ -1078,6 +1106,55 @@
     </svg>`;
   }
 
+  function getPieSlices(domains) {
+    const totalSlices = domains.length;
+    if (totalSlices === 0) {
+      return [
+        {
+          d: "",
+          fill: DOMEIN_COLORS.default,
+          domain: "default",
+        },
+      ];
+    }
+    if (totalSlices === 1) {
+      return [
+        {
+          d: "",
+          fill: DOMEIN_COLORS[domains[0]] || DOMEIN_COLORS.default,
+          domain: domains[0],
+        },
+      ];
+    }
+
+    const r = 50;
+    const cx = 50;
+    const cy = 50;
+    let slices = [];
+    let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
+    const anglePerSlice = (2 * Math.PI) / totalSlices;
+
+    for (let i = 0; i < totalSlices; i++) {
+      const startAngle = accumulatedAngle;
+      const endAngle = accumulatedAngle + anglePerSlice;
+      accumulatedAngle = endAngle;
+
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+
+      const largeArcFlag = 0;
+      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+      slices.push({
+        d: pathData,
+        fill: DOMEIN_COLORS[domains[i]] || DOMEIN_COLORS.default,
+        domain: domains[i],
+      });
+    }
+    return slices;
+  }
+
   $effect(() => {
     if (!map) return;
 
@@ -1099,6 +1176,7 @@
 
       el.className = "air-marker";
       if (isArea) el.classList.add("air-area-marker");
+      if (visualMode === "domein") el.classList.add("thin-border");
       const domeinList = [
         ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
       ].filter(Boolean);
@@ -1756,6 +1834,15 @@
     </div>
 
     {#if selectedPlace}
+      {@const slices = getPieSlices(
+        [
+          ...new Set(
+            (selectedPlace.domeinen || "")
+              .split(";")
+              .map((d) => d.trim()),
+          ),
+        ].filter(Boolean),
+      )}
       <div
         class="fixed-air-popup"
         onclick={(e) => e.stopPropagation()}
@@ -1789,18 +1876,49 @@
 
           <div class="popup-info-row domains-row">
             <span class="label">Domeinen</span>
-            <div class="popup-tags">
-              {#each [...new Set((selectedPlace.domeinen || "")
-                    .split(";")
-                    .map((d) => d.trim()))] as d}
-                <span
-                  class="p-tag domain-name-tag"
-                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                    DOMEIN_COLORS.default}"
-                >
-                  {d.trim()}
-                </span>
-              {/each}
+            <div class="domains-display">
+              <div class="domains-pie-wrapper">
+                <svg viewBox="0 0 100 100" class="popup-pie-svg">
+                  {#if slices.length <= 1}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="50"
+                      fill={slices[0].fill}
+                      class="pie-slice"
+                      class:highlighted-slice={hoveredSliceDomain === slices[0].domain}
+                      onmouseenter={() => (hoveredSliceDomain = slices[0].domain)}
+                      onmouseleave={() => (hoveredSliceDomain = null)}
+                    />
+                  {:else}
+                    {#each slices as slice}
+                      <path
+                        d={slice.d}
+                        fill={slice.fill}
+                        class="pie-slice"
+                        class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                        onmouseenter={() => (hoveredSliceDomain = slice.domain)}
+                        onmouseleave={() => (hoveredSliceDomain = null)}
+                      />
+                    {/each}
+                  {/if}
+                </svg>
+              </div>
+              <div class="domains-tags-list">
+                {#each slices as slice}
+                  {#if slice.domain !== "default"}
+                    <span
+                      class="p-tag domain-name-tag interactive-tag"
+                      class:highlighted-tag={hoveredSliceDomain === slice.domain}
+                      style="background-color: {slice.fill};"
+                      onmouseenter={() => (hoveredSliceDomain = slice.domain)}
+                      onmouseleave={() => (hoveredSliceDomain = null)}
+                    >
+                      {slice.domain}
+                    </span>
+                  {/if}
+                {/each}
+              </div>
             </div>
           </div>
 
@@ -3063,10 +3181,10 @@
   }
 
   :global(.air-marker) {
-    width: 20px;
-    min-width: 20px;
-    height: 20px;
-    border: 3px solid #ffffff;
+    width: var(--marker-size, 20px);
+    min-width: var(--marker-size, 20px);
+    height: var(--marker-size, 20px);
+    border: var(--marker-border-width, 3px) solid #ffffff;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
@@ -3083,8 +3201,13 @@
       border-color 0.25s ease;
   }
 
+  :global(.air-marker.thin-border) {
+    border-width: 1px !important;
+    border-color: #ffffff !important;
+  }
+
   :global(.air-marker i) {
-    font-size: 11px;
+    font-size: calc(var(--marker-size, 20px) * 0.55);
     line-height: 1;
   }
 
@@ -3108,14 +3231,14 @@
       0 0 0 2px rgba(255, 255, 255, 0.4),
       0 0 12px 6px rgba(100, 88, 245, 0.1),
       0 2px 5px rgba(0, 0, 0, 0.2);
-    width: 20px;
-    min-width: 20px;
-    height: 20px;
+    width: var(--marker-size, 20px);
+    min-width: var(--marker-size, 20px);
+    height: var(--marker-size, 20px);
     border-radius: 50%;
   }
 
   :global(.air-area-marker i) {
-    font-size: 10px;
+    font-size: calc(var(--marker-size, 20px) * 0.5);
   }
   .logos-section {
     display: flex;
@@ -4052,5 +4175,64 @@
     height: 48px;
     width: auto;
     object-fit: contain;
+  }
+
+  .domains-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  .domains-pie-wrapper {
+    width: 44px;
+    height: 44px;
+    border: 2.5px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  .popup-pie-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+  }
+
+  .pie-slice {
+    transition: filter 0.15s ease;
+    cursor: pointer;
+  }
+
+  .pie-slice:hover,
+  .pie-slice.highlighted-slice {
+    filter: brightness(1.15) saturate(1.15);
+  }
+
+  .domains-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .interactive-tag {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  }
+
+  .interactive-tag:hover,
+  .interactive-tag.highlighted-tag {
+    transform: scale(1.08);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    filter: brightness(1.05);
   }
 </style>
