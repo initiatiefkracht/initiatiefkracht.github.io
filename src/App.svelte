@@ -1411,33 +1411,6 @@
   {/if}
 
   <div class="map-container" bind:this={mapContainer}>
-    {#if !isMobile && showQrBlock}
-      <div class="floating-qr-block">
-        <button
-          class="qr-close-btn"
-          onclick={() => (showQrBlock = false)}
-          aria-label="Sluiten"
-        >
-          <i class="ph ph-x"></i>
-        </button>
-        <div class="qr-content">
-          <p class="qr-info-text">
-            Op de kaart vind je slechts een kleine verzameling van de
-            initiatiefkracht in Rotterdam. De kaart is volop in ontwikkeling,
-            dus als je een initiatief mist, laat hem achter in de ideeënbus!
-          </p>
-
-          <div class="qr-code-wrap">
-            <img src="initiatieven_QR.png" alt="Initiatieven QR code" />
-          </div>
-
-          <p class="qr-scan-text">
-            Scan deze qr code om de kaart te ontdekken!
-          </p>
-        </div>
-      </div>
-    {/if}
-
     {#if selectedPlace}
       <div
         class="fixed-air-popup"
