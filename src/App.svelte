@@ -179,7 +179,7 @@
           const el = document.createElement("div");
           el.className = "temp-marker";
           el.innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">' +
+            '<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff;">' +
             '<i class="ph ph-plus" style="font-size: 11px; color: #ffffff; font-weight: 900;"></i>' +
             "</div>";
           tempMarker = new maplibregl.Marker({ element: el })
@@ -259,7 +259,7 @@
     Circulair: "#fac559",
     Mobiliteit: "#ff8086",
     Energie: "#ffa6e1",
-    default: "#c3c4e4",
+    default: "#5d69fb",
   };
 
   const DOMEIN_ICONS = {
@@ -1066,20 +1066,25 @@
   });
 
   function getPieChartSvg(colors) {
+    const dropletPath =
+      "M 50 92 C 40 80, 18 63, 18 40 A 32 32 0 1 1 82 40 C 82 63, 60 80, 50 92 Z";
+
     if (colors.length === 0) {
-      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block;">
-        <circle cx="50" cy="50" r="50" fill="#5d69fb" />
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
+        <circle cx="50" cy="40" r="25" fill="#5d69fb" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
-      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block;">
-        <circle cx="50" cy="50" r="50" fill="${colors[0]}" />
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
+        <circle cx="50" cy="40" r="25" fill="${colors[0]}" class="inner-circle" />
       </svg>`;
     }
 
-    const r = 50;
-    const cx = 50;
-    const cy = 50;
+    const r = 25; // Radius of the inner circle
+    const cx = 50; // Center of the circular part
+    const cy = 40; // Center of the circular part
     let paths = [];
     const totalSlices = colors.length;
 
@@ -1101,8 +1106,19 @@
       paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
     }
 
-    return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; border-radius: 50%;">
-      ${paths.join("")}
+    const clipId = "droplet-clip-" + Math.random().toString(36).substring(2, 9);
+
+    return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+      <defs>
+        <clipPath id="${clipId}">
+          <circle cx="50" cy="40" r="25" />
+        </clipPath>
+      </defs>
+      <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
+      <g clip-path="url(#${clipId})">
+        ${paths.join("")}
+      </g>
+      <circle cx="50" cy="40" r="25" fill="none" class="inner-circle" />
     </svg>`;
   }
 
@@ -1199,21 +1215,20 @@
 
       el.style.backgroundColor = "transparent";
 
+      let borderCol = "#5d69fb";
+      if (visualMode === "gebied") {
+        const gebiedKey = place.gebied || "default";
+        borderCol = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
+      } else if (visualMode === "koepel") {
+        const koepelKey =
+          (place.koepels || "").split(";").map((k) => k.trim())[0] || "default";
+        borderCol = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
+      }
+      el.style.borderColor = borderCol;
+      el.style.setProperty("--marker-border-color", borderCol);
+
       if (isArea) {
         el.style.opacity = "0.55";
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#5d69fb";
-        }
         const areaGebieden = (place.gebied || "")
           .split(";")
           .map((g) => g.trim());
@@ -1224,20 +1239,6 @@
         el.addEventListener("mouseleave", () => {
           hoveredAreaGebieden = [];
         });
-      } else {
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#5d69fb";
-        }
       }
 
       el.addEventListener("click", (e) => {
@@ -1245,7 +1246,7 @@
         activatePlaceOnMap(place);
       });
 
-      const m = new maplibregl.Marker({ element: container })
+      const m = new maplibregl.Marker({ element: container, anchor: "bottom" })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
@@ -3183,64 +3184,81 @@
   }
 
   :global(.air-marker) {
-    width: var(--marker-size, 20px);
-    min-width: var(--marker-size, 20px);
-    height: var(--marker-size, 20px);
-    border: var(--marker-border-width, 3px) solid #ffffff;
-    border-radius: 50%;
+    width: var(--marker-size, 25px);
+    min-width: var(--marker-size, 25px);
+    height: var(--marker-size, 25px);
+    border: none;
+    border-radius: 0;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
     background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    overflow: hidden;
+    overflow: visible;
     box-sizing: border-box;
+    transform-origin: 50% 92%;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-      box-shadow 0.25s ease,
-      border-color 0.25s ease;
+      filter 0.25s ease;
   }
 
-  :global(.air-marker.thin-border) {
-    border-width: 1px !important;
-    border-color: #ffffff !important;
+  :global(.air-marker .outer-droplet) {
+    stroke: #ffffff;
+    stroke-width: 7;
+    stroke-linejoin: round;
+  }
+
+  :global(.air-marker .inner-circle) {
+    /* stroke: var(--marker-border-color, #5d69fb);
+    stroke-width: calc(
+      var(--marker-border-width, 3px) * 100 / var(--marker-size, 20)
+    ); */
+    transition:
+      stroke 0.25s ease,
+      stroke-width 0.25s ease;
+  }
+
+  :global(.air-marker.thin-border .inner-circle) {
+    stroke: #ffffff !important;
+    stroke-width: calc(1px * 100 / var(--marker-size, 25)) !important;
   }
 
   :global(.air-marker i) {
-    font-size: calc(var(--marker-size, 20px) * 0.55);
+    font-size: calc(var(--marker-size, 25px) * 0.55);
     line-height: 1;
   }
 
   :global(.marker-container:hover .air-marker) {
     transform: scale(1.3);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
   }
 
   :global(.air-marker.active-glow) {
-    border: 2px solid #6458f5;
-    box-shadow:
-      0 0 0 3px rgba(100, 88, 245, 0.25),
-      0 0 12px 6px rgba(100, 88, 245, 0.2),
-      0 2px 6px rgba(0, 0, 0, 0.2);
     transform: scale(1.15);
+    filter: drop-shadow(0 0 3px rgba(100, 88, 245, 0.8))
+      drop-shadow(0 0 8px rgba(100, 88, 245, 0.4))
+      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  }
+
+  :global(.air-marker.active-glow .inner-circle) {
+    /* stroke: #6458f5 !important; */
+    stroke-width: calc(2px * 100 / var(--marker-size, 25)) !important;
   }
 
   :global(.air-area-marker) {
-    /* border: 2px solid #ffffff; */
-    box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.4),
-      0 0 12px 6px rgba(100, 88, 245, 0.1),
-      0 2px 5px rgba(0, 0, 0, 0.2);
-    width: var(--marker-size, 20px);
-    min-width: var(--marker-size, 20px);
-    height: var(--marker-size, 20px);
-    border-radius: 50%;
+    width: var(--marker-size, 25px);
+    min-width: var(--marker-size, 25px);
+    height: var(--marker-size, 25px);
+    border-radius: 0;
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4))
+      drop-shadow(0 0 8px rgba(100, 88, 245, 0.1))
+      drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
   }
 
   :global(.air-area-marker i) {
-    font-size: calc(var(--marker-size, 20px) * 0.5);
+    font-size: calc(var(--marker-size, 25px) * 0.5);
   }
   .logos-section {
     display: flex;
