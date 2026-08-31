@@ -170,7 +170,7 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 181;Staringtuin ;51.91851393;4.438120837;Spangen;Groen;http://www.studiojoostvandijk.nl/staringtuin/;;plek;point
 182;Blauwe Vos;51.91778692;4.439180043;Spangen;Groen;;;plek;point
 183;Bellamyplein Waterplein - buurtkas op;51.91633333;4.433694444;Spangen;Groen;;;plek;point
-184;Nieuwe Buren;51.91575;4.434333333;Spangen;Groen;;;plek;point
+184;Nieuwe Buren;51.91575;4.434333333;Spangen;Groen;https://platformbinnentuinen.nl/tuinen/de-nieuwe-buren;;plek;point
 186;Afrikaanderwijk Cooperatie;51.89883333;4.500444444;Afrikaanderwijk;Groen;http://wijkcooperatie.org/;;plek;point
 187;Afrikaanderwijk Botanische Tuin;51.89966667;4.502916667;Afrikaanderwijk;Groen;http://btarotterdam.nl/btarotterdam.nl/en/home-2/;;plek;point
 188;In de Roos Bloemhof ;51.89463889;4.500055556;Bloemhof;Groen;http://platformbinnentuinen.nl/tuinen/in-de-roos/;;plek;point
@@ -287,3 +287,4 @@ fid;name;latitude;longitude;gebied;domeinen;website;koepels;initiatief_type;loca
 303;Rozenburg Dorpstuin;51.91325;4.229166667;Rozenburg;Groen;http://www.dorpstuinrozenburg.nl/;;plek;point
 305;Voedselbos Vlaardingen;51.90644;4.308109;Westwijk;Groen;https://www.voedselbosvlaardingen.nl/;;plek;point
 306;Textielatelier Katendrecht;51.900761;4.482784;Katendrecht;Circulair;https://www.instagram.com/textielatelierkatendrecht/;;plek;point
+307;Testlocatie;51.921251;4.454982;"Nieuwe Westen; Blijdorp";"Cultuur; Klimaat";www.initiatievenkaart.nl;;plek;point

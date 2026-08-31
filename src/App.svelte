@@ -250,15 +250,15 @@
   const MAX_CHOROPLETH_NEIGHBORHOODS = 15;
 
   const DOMEIN_COLORS = {
-    Wonen: "#f1c5de",
-    Welzijn: "#FDF4C5",
-    Cultuur: "#f6b3a9",
-    Klimaat: "#A2E8DD",
-    Voedsel: "#6cb85e",
-    Groen: "#a5d2ac",
-    Circulair: "#fdc75a",
-    Mobiliteit: "#dd8787",
-    Energie: "#fbdbdf",
+    Wonen: "#f44764",
+    Welzijn: "#ffeb78",
+    Cultuur: "#ffa669",
+    Klimaat: "#6bc0c9",
+    Voedsel: "#7bc16b",
+    Groen: "#a3d1ab",
+    Circulair: "#fac559",
+    Mobiliteit: "#ff8086",
+    Energie: "#ffa6e1",
     default: "#c3c4e4",
   };
 
@@ -1837,9 +1837,7 @@
       {@const slices = getPieSlices(
         [
           ...new Set(
-            (selectedPlace.domeinen || "")
-              .split(";")
-              .map((d) => d.trim()),
+            (selectedPlace.domeinen || "").split(";").map((d) => d.trim()),
           ),
         ].filter(Boolean),
       )}
@@ -1886,8 +1884,10 @@
                       r="50"
                       fill={slices[0].fill}
                       class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain === slices[0].domain}
-                      onmouseenter={() => (hoveredSliceDomain = slices[0].domain)}
+                      class:highlighted-slice={hoveredSliceDomain ===
+                        slices[0].domain}
+                      onmouseenter={() =>
+                        (hoveredSliceDomain = slices[0].domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     />
                   {:else}
@@ -1896,7 +1896,8 @@
                         d={slice.d}
                         fill={slice.fill}
                         class="pie-slice"
-                        class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                        class:highlighted-slice={hoveredSliceDomain ===
+                          slice.domain}
                         onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                         onmouseleave={() => (hoveredSliceDomain = null)}
                       />
@@ -1905,11 +1906,12 @@
                 </svg>
               </div>
               <div class="domains-tags-list">
-                {#each slices as slice}
+                {#each slices.length === 2 ? [...slices].reverse() : slices as slice}
                   {#if slice.domain !== "default"}
                     <span
                       class="p-tag domain-name-tag interactive-tag"
-                      class:highlighted-tag={hoveredSliceDomain === slice.domain}
+                      class:highlighted-tag={hoveredSliceDomain ===
+                        slice.domain}
                       style="background-color: {slice.fill};"
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
@@ -4226,7 +4228,10 @@
 
   .interactive-tag {
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease;
   }
 
   .interactive-tag:hover,
