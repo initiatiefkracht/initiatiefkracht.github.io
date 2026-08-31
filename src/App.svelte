@@ -1065,24 +1065,80 @@
     opacityAnimationFrame = requestAnimationFrame(animateOpacity);
   });
 
-  function getPieChartSvg(colors) {
+  function getPieChartSvg(colors, isArea = false, outerColor = "#ffffff") {
+    if (isArea) {
+      const cx = 50;
+      const cy = 50;
+      const outerR = 36;
+      const innerR = 29;
+
+      if (colors.length === 0) {
+        return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+          <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" class="inner-circle" />
+        </svg>`;
+      }
+      if (colors.length === 1) {
+        return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+          <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" class="inner-circle" />
+        </svg>`;
+      }
+
+      let paths = [];
+      const totalSlices = colors.length;
+
+      let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
+      const anglePerSlice = (2 * Math.PI) / totalSlices;
+
+      for (let i = 0; i < totalSlices; i++) {
+        const startAngle = accumulatedAngle;
+        const endAngle = accumulatedAngle + anglePerSlice;
+        accumulatedAngle = endAngle;
+
+        const x1 = cx + innerR * Math.cos(startAngle);
+        const y1 = cy + innerR * Math.sin(startAngle);
+        const x2 = cx + innerR * Math.cos(endAngle);
+        const y2 = cy + innerR * Math.sin(endAngle);
+
+        const largeArcFlag = 0;
+        const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR} ${innerR} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+        paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
+      }
+
+      const clipId = "area-clip-" + Math.random().toString(36).substring(2, 9);
+
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        <defs>
+          <clipPath id="${clipId}">
+            <circle cx="${cx}" cy="${cy}" r="${innerR}" />
+          </clipPath>
+        </defs>
+        <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
+        <g clip-path="url(#${clipId})">
+          ${paths.join("")}
+        </g>
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" class="inner-circle" />
+      </svg>`;
+    }
+
     const dropletPath =
       "M 50 92 C 40 80, 18 63, 18 40 A 32 32 0 1 1 82 40 C 82 63, 60 80, 50 92 Z";
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
-        <circle cx="50" cy="40" r="25" fill="#5d69fb" class="inner-circle" />
+        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
+        <circle cx="50" cy="40" r="29" fill="#5d69fb" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
-        <circle cx="50" cy="40" r="25" fill="${colors[0]}" class="inner-circle" />
+        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
+        <circle cx="50" cy="40" r="29" fill="${colors[0]}" class="inner-circle" />
       </svg>`;
     }
 
-    const r = 25; // Radius of the inner circle
+    const r = 29; // Radius of the inner circle
     const cx = 50; // Center of the circular part
     const cy = 40; // Center of the circular part
     let paths = [];
@@ -1111,14 +1167,14 @@
     return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
       <defs>
         <clipPath id="${clipId}">
-          <circle cx="50" cy="40" r="25" />
+          <circle cx="50" cy="40" r="29" />
         </clipPath>
       </defs>
-      <path class="outer-droplet" d="${dropletPath}" fill="#ffffff" />
+      <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
       <g clip-path="url(#${clipId})">
         ${paths.join("")}
       </g>
-      <circle cx="50" cy="40" r="25" fill="none" class="inner-circle" />
+      <circle cx="50" cy="40" r="29" fill="none" class="inner-circle" />
     </svg>`;
   }
 
@@ -1210,11 +1266,6 @@
         sliceColors = [DOMEIN_COLORS.default];
       }
 
-      el.innerHTML = getPieChartSvg(sliceColors);
-      container.appendChild(el);
-
-      el.style.backgroundColor = "transparent";
-
       let borderCol = "#5d69fb";
       if (visualMode === "gebied") {
         const gebiedKey = place.gebied || "default";
@@ -1224,11 +1275,21 @@
           (place.koepels || "").split(";").map((k) => k.trim())[0] || "default";
         borderCol = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
       }
+
+      const outerColor =
+        visualMode === "koepel" || visualMode === "gebied"
+          ? borderCol
+          : "#ffffff";
+
+      el.innerHTML = getPieChartSvg(sliceColors, isArea, outerColor);
+      container.appendChild(el);
+
+      el.style.backgroundColor = "transparent";
       el.style.borderColor = borderCol;
       el.style.setProperty("--marker-border-color", borderCol);
+      el.style.setProperty("--outer-droplet-color", outerColor);
 
       if (isArea) {
-        el.style.opacity = "0.55";
         const areaGebieden = (place.gebied || "")
           .split(";")
           .map((g) => g.trim());
@@ -1246,7 +1307,10 @@
         activatePlaceOnMap(place);
       });
 
-      const m = new maplibregl.Marker({ element: container, anchor: "bottom" })
+      const m = new maplibregl.Marker({
+        element: container,
+        anchor: isArea ? "center" : "bottom",
+      })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
@@ -3184,9 +3248,9 @@
   }
 
   :global(.air-marker) {
-    width: var(--marker-size, 25px);
-    min-width: var(--marker-size, 25px);
-    height: var(--marker-size, 25px);
+    width: var(--marker-size, 29px);
+    min-width: var(--marker-size, 29px);
+    height: var(--marker-size, 29px);
     border: none;
     border-radius: 0;
     cursor: pointer;
@@ -3205,7 +3269,7 @@
   }
 
   :global(.air-marker .outer-droplet) {
-    stroke: #ffffff;
+    stroke: var(--outer-droplet-color, #ffffff);
     stroke-width: 7;
     stroke-linejoin: round;
   }
@@ -3222,11 +3286,11 @@
 
   :global(.air-marker.thin-border .inner-circle) {
     stroke: #ffffff !important;
-    stroke-width: calc(1px * 100 / var(--marker-size, 25)) !important;
+    stroke-width: calc(1px * 100 / var(--marker-size, 29)) !important;
   }
 
   :global(.air-marker i) {
-    font-size: calc(var(--marker-size, 25px) * 0.55);
+    font-size: calc(var(--marker-size, 29px) * 0.55);
     line-height: 1;
   }
 
@@ -3236,15 +3300,13 @@
   }
 
   :global(.air-marker.active-glow) {
-    transform: scale(1.15);
-    filter: drop-shadow(0 0 3px rgba(100, 88, 245, 0.8))
-      drop-shadow(0 0 8px rgba(100, 88, 245, 0.4))
-      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    transform: scale(1.3);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   }
 
   :global(.air-marker.active-glow .inner-circle) {
     /* stroke: #6458f5 !important; */
-    stroke-width: calc(2px * 100 / var(--marker-size, 25)) !important;
+    stroke-width: calc(2px * 100 / var(--marker-size, 29)) !important;
   }
 
   :global(.air-area-marker) {
@@ -3252,6 +3314,7 @@
     min-width: var(--marker-size, 25px);
     height: var(--marker-size, 25px);
     border-radius: 0;
+    transform-origin: 50% 50% !important;
     filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4))
       drop-shadow(0 0 8px rgba(100, 88, 245, 0.1))
       drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
