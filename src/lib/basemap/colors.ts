@@ -1,24 +1,56 @@
+// ─── Master color knobs ────────────────────────────────────────────────────
+// Change these two values to repaint all water or all greenery on the map.
+
+export const WATER_COLOR = '#efefffff'// all water bodies & labels
+export const GREENERY_COLOR = 'rgba(255, 255, 255, 1)' // base green for parks / woods / scrub etc.
+export const BUILDINGS_COLOR = '#6d6dacff'
+
+// Derived greenery tones (slightly lighter / darker variants of the base)
+// You can override these individually if you want more control.
+const GREENERY_PARK = GREENERY_COLOR // park_a / park_b / zoo
+const GREENERY_WOOD = GREENERY_COLOR  // wood_a / wood_b
+const GREENERY_SCRUB = GREENERY_COLOR  // scrub_a / scrub_b
+const GREENERY_GRASS = GREENERY_COLOR // landcover.grassland
+const GREENERY_FARM = GREENERY_COLOR  // landcover.farmland
+const GREENERY_FOREST = GREENERY_COLOR                  // landcover.forest
+
+/** Utility: mix color toward white by `amount` (0-1). Works on rgba() strings. */
+function lighten(rgba: string, amount: number): string {
+  const m = rgba.match(/[\d.]+/g)
+  if (!m || m.length < 3) return rgba
+  const blend = (v: number) => Math.round(v + (255 - v) * amount)
+  return `rgba(${blend(+m[0])}, ${blend(+m[1])}, ${blend(+m[2])}, ${m[3] ?? '1'})`
+}
+
+// ─── Full basemap flavor ───────────────────────────────────────────────────
+
 export const ALLMAPS_FLAVOR = {
   background: 'rgba(255, 252, 244, 1)',
   earth: 'rgba(255, 252, 244, 1)',
-  park_a: '#e0eec9',
-  park_b: '#e0eec9',
-  hospital: 'rgba(255, 240, 240, 1)',
-  industrial: 'rgba(250, 245, 236, 1)',
-  school: 'rgba(255, 245, 229, 1)',
-  wood_a: '#d4ebcc',
-  wood_b: '#d4ebcc',
-  pedestrian: '#fffdf9',
-  scrub_a: '#e9eed9',
-  scrub_b: '#e9eed9',
-  glacier: '#ffffff',
-  sand: 'rgba(255, 245, 219, 1)',
+
+  // Greenery
+  park_a: GREENERY_PARK,
+  park_b: GREENERY_PARK,
+  wood_a: GREENERY_WOOD,
+  wood_b: GREENERY_WOOD,
+  scrub_a: GREENERY_SCRUB,
+  scrub_b: GREENERY_SCRUB,
+  zoo: GREENERY_PARK,
+
+  // Water
+  water: WATER_COLOR,
+  pier: WATER_COLOR,
+
+  // Buildings
+  hospital: BUILDINGS_COLOR,
+  industrial: BUILDINGS_COLOR,
+  school: BUILDINGS_COLOR,
+  pedestrian: BUILDINGS_COLOR,
+  glacier: BUILDINGS_COLOR,
+  sand: BUILDINGS_COLOR,
   beach: 'rgba(255, 239, 203, 1)',
   aerodrome: 'rgba(245, 245, 249, 1)',
   runway: 'rgba(193, 195, 217, 1)',
-  water: 'rgba(99, 216, 230, 1)',
-  pier: '#cdf1f0',
-  zoo: 'rgba(231, 244, 223, 1)',
   military: 'rgba(246, 241, 231, 1)',
 
   tunnel_other_casing: 'rgba(255, 252, 244, 1)',
@@ -35,7 +67,7 @@ export const ALLMAPS_FLAVOR = {
   tunnel_highway: 'rgba(205, 204, 200, 1)',
 
   transit_pier: 'rgba(205, 241, 240, 1)',
-  buildings: 'rgba(241, 235, 221, 1)',
+  buildings: BUILDINGS_COLOR,
 
   minor_service_casing: 'rgba(255, 252, 244, 1)',
   minor_casing: 'rgba(255, 252, 244, 1)',
@@ -56,7 +88,7 @@ export const ALLMAPS_FLAVOR = {
 
   railway: 'rgba(192, 192, 192, 1)',
   boundaries: '#bfad81',
-  waterway_label: 'rgba(67, 145, 155, 1)',
+  waterway_label: 'rgba(43, 168, 180, 1)',   // darker tint of WATER_COLOR — adjust alongside WATER_COLOR
 
   bridges_other_casing: 'rgba(255, 252, 244, 1)',
   bridges_minor_casing: 'rgba(255, 252, 244, 1)',
@@ -93,13 +125,13 @@ export const ALLMAPS_FLAVOR = {
   italic: 'Roboto Italic',
 
   landcover: {
-    grassland: 'rgba(224, 238, 205, 1)',
-    barren: 'rgba(247, 243, 218, 1)',
-    urban_area: 'rgba(255, 247, 228, 1)',
-    farmland: 'rgba(230, 237, 209, 1)',
-    glacier: 'rgba(255, 249, 235, 1)',
-    scrub: 'rgba(238, 238, 193, 1)',
-    forest: 'rgba(209, 233, 188, 1)'
+    grassland: GREENERY_GRASS,
+    barren: GREENERY_COLOR,
+    urban_area: GREENERY_COLOR,
+    farmland: GREENERY_FARM,
+    glacier: GREENERY_COLOR,
+    scrub: GREENERY_SCRUB,
+    forest: GREENERY_FOREST,
   }
 }
 

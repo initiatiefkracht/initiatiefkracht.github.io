@@ -2,8 +2,7 @@ import { layers as basemapLayers } from '@protomaps/basemaps'
 import mlcontour from 'maplibre-contour'
 import { Map } from 'maplibre-gl'
 import { StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
-import { ALLMAPS_FLAVOR, TERRAIN_COLORS } from './colors.js'
-import { WHITE } from '@protomaps/basemaps'
+import { ALLMAPS_FLAVOR, TERRAIN_COLORS } from './colors'
 
 export function basemapStyle(
   lang: string,
@@ -11,19 +10,22 @@ export function basemapStyle(
   sprite?: string,
   tileJson?: string
 ): StyleSpecification {
-  const layers = basemapLayers('protomaps', WHITE, { lang: lang })
-  // modify the buildings layer
-  layers.forEach((layer) => {
-    if (layer.id === 'buildings') {
-      if (layer.paint && 'fill-outline-color' in layer.paint) {
-        layer.paint['fill-outline-color'] = 'rgba(139, 134, 123, 1)'
-      }
+  const allLayers = basemapLayers('protomaps', ALLMAPS_FLAVOR, { lang: lang })
 
-      if (layer.paint && 'fill-opacity' in layer.paint) {
-        layer.paint['fill-opacity'] = 0.5
-      }
-    }
-  })
+  // Keep only background, earth, greenery (parks/urban green), water, and buildings
+  const allowedLayerIds = new Set([
+    'background',
+    'earth',
+    'landuse_park',
+    'landuse_urban_green',
+    'water',
+    'water_stream',
+    'water_river',
+    'buildings'
+  ])
+
+  const layers = allLayers.filter((layer) => allowedLayerIds.has(layer.id))
+
   return {
     version: 8,
     glyphs:

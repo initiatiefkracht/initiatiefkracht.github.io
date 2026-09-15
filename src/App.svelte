@@ -1,6 +1,7 @@
 <script>
   import { onMount, untrack } from "svelte";
   import maplibregl from "maplibre-gl";
+  import { basemapStyle } from "./lib/basemap";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -116,33 +117,7 @@
       renderWorldCopies: false,
       trackResize: true,
       pitchWithRotate: false,
-      style: {
-        version: 8,
-        sources: {
-          "satellite-source": {
-            type: "raster",
-            tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            ],
-            tileSize: 256,
-            maxzoom: 19,
-            attribution:
-              "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-          },
-        },
-        layers: [
-          {
-            id: "satellite-layer",
-            type: "raster",
-            source: "satellite-source",
-            paint: {
-              "raster-saturation": -0.9,
-              "raster-brightness-max": 1,
-              "raster-opacity": 0.6,
-            },
-          },
-        ],
-      },
+      style: basemapStyle("nl"),
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -222,15 +197,18 @@
     // Smooth continuous marker scaling via CSS transform (GPU-composited, no reflow)
     // Base marker size is fixed at 26px; we just scale it with transform.
     const BASE_ZOOM = 12.5;
-    const MIN_SCALE = 0.55;  // at zoom ~9
-    const MAX_SCALE = 1.8;   // at zoom ~16
-    const ZOOM_REF = 12.5;   // scale = 1.0 at this zoom
+    const MIN_SCALE = 0.55; // at zoom ~9
+    const MAX_SCALE = 1.8; // at zoom ~16
+    const ZOOM_REF = 12.5; // scale = 1.0 at this zoom
 
     let rafId = null;
     const updateMarkerScale = () => {
       const zoom = map.getZoom();
       // Linear interpolation: every zoom step = 15% size change (same as map tile doubling)
-      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)));
+      const scale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)),
+      );
       if (mapContainer) {
         mapContainer.style.setProperty("--marker-scale", scale.toFixed(4));
       }
@@ -1080,14 +1058,24 @@
 
       if (colors.length === 0) {
         return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+          <defs>
+            <filter id="area-shadow-0" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+            </filter>
+          </defs>
           <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" class="inner-circle" />
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" class="inner-circle" filter="url(#area-shadow-0)" />
         </svg>`;
       }
       if (colors.length === 1) {
         return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+          <defs>
+            <filter id="area-shadow-1" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+            </filter>
+          </defs>
           <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" class="inner-circle" />
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" class="inner-circle" filter="url(#area-shadow-1)" />
         </svg>`;
       }
 
@@ -1113,15 +1101,19 @@
       }
 
       const clipId = "area-clip-" + Math.random().toString(36).substring(2, 9);
+      const shadowId = "area-shadow-" + clipId;
 
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <defs>
           <clipPath id="${clipId}">
             <circle cx="${cx}" cy="${cy}" r="${innerR}" />
           </clipPath>
+          <filter id="${shadowId}" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+          </filter>
         </defs>
         <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
-        <g clip-path="url(#${clipId})">
+        <g clip-path="url(#${clipId})" filter="url(#${shadowId})">
           ${paths.join("")}
         </g>
         <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" class="inner-circle" />
@@ -1129,21 +1121,31 @@
     }
 
     const dropletPath =
-      "M 50 93 C 37 81, 12 64, 12 40 A 38 38 0 1 1 88 40 C 88 64, 63 81, 50 93 Z";
+      "M 50 100 C 40 86, 12 64, 12 40 A 38 38 0 1 1 88 40 C 88 64, 60 86, 50 100 Z";
     const r = 32; // Radius of the inner circle (identical to area dot innerR = 32)
     const cx = 50; // Center of the circular part
     const cy = 40; // Center of the circular part
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        <defs>
+          <filter id="circle-shadow-0" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+          </filter>
+        </defs>
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" class="inner-circle" filter="url(#circle-shadow-0)" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        <defs>
+          <filter id="circle-shadow-1" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+          </filter>
+        </defs>
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" class="inner-circle" filter="url(#circle-shadow-1)" />
       </svg>`;
     }
 
@@ -1170,14 +1172,18 @@
 
     const clipId = "droplet-clip-" + Math.random().toString(36).substring(2, 9);
 
+    const shadowId = "circle-shadow-" + clipId;
     return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
       <defs>
         <clipPath id="${clipId}">
           <circle cx="${cx}" cy="${cy}" r="${r}" />
         </clipPath>
+        <filter id="${shadowId}" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.35)" />
+        </filter>
       </defs>
       <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-      <g clip-path="url(#${clipId})">
+      <g clip-path="url(#${clipId})" filter="url(#${shadowId})">
         ${paths.join("")}
       </g>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" class="inner-circle" />
@@ -1244,31 +1250,16 @@
     ].filter(Boolean);
     const N = domeinList.length;
 
-    const cx = 50, cy = 50;
-    const outerR = 47;        // outer edge of ring
-    const ringW = 11;         // ring stroke width
-    const innerR = outerR - ringW; // = 36, inner edge of ring = pie outer radius
-    const ringTextR = outerR - ringW / 2; // = 41.5, midpoint of ring
-    const sliceTextR = innerR * 0.58;     // ~20.9, midpoint inside pie
+    // Mirror area marker geometry exactly
+    const cx = 50,
+      cy = 50;
+    const outerR = 41; // colored border circle (same as area marker)
+    const innerR = 32; // pie fill radius (same as area marker)
 
     const hoofddomeinColor =
       DOMEIN_COLORS[(hoofddomein || "").trim()] ||
       DOMEIN_COLORS[domeinList[0]] ||
       "#5d69fb";
-
-    // Font sizes based on number of domains
-    const fzRing = N <= 2 ? 5.5 : N <= 4 ? 4.5 : 3.5;
-    const fzSlice = N <= 2 ? 4.5 : N <= 4 ? 3.8 : 3.0;
-
-    // Arc path helper: arc only (no fill), used as textPath reference
-    const arcD = (r, a1, a2, sweep) => {
-      const x1 = cx + r * Math.cos(a1);
-      const y1 = cy + r * Math.sin(a1);
-      const x2 = cx + r * Math.cos(a2);
-      const y2 = cy + r * Math.sin(a2);
-      const large = Math.abs(a2 - a1) > Math.PI ? 1 : 0;
-      return `M${x1.toFixed(3)},${y1.toFixed(3)} A${r},${r} 0 ${large} ${sweep} ${x2.toFixed(3)},${y2.toFixed(3)}`;
-    };
 
     const anglePerSlice = (2 * Math.PI) / Math.max(N, 1);
 
@@ -1277,10 +1268,14 @@
       const endAngle = startAngle + anglePerSlice;
       const midAngle = (startAngle + endAngle) / 2;
 
+      // Centroid of slice for text placement (at 60% of inner radius)
+      const textR = innerR * 0.6;
+      const midX = (cx + textR * Math.cos(midAngle)).toFixed(2);
+      const midY = (cy + textR * Math.sin(midAngle)).toFixed(2);
+
       // Pie slice path
       let piePath;
       if (N === 1) {
-        // Full circle as pie
         piePath = `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`;
       } else {
         const x1 = (cx + innerR * Math.cos(startAngle)).toFixed(3);
@@ -1291,42 +1286,36 @@
         piePath = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR},${innerR} 0 ${laf} 1 ${x2} ${y2} Z`;
       }
 
-      // Text on ring: clockwise for upper-half midpoints, counter-clockwise for lower
-      const isTopHalf = Math.sin(midAngle) <= 0;
-      const ringArc = isTopHalf
-        ? arcD(ringTextR, startAngle, endAngle, 1)
-        : arcD(ringTextR, endAngle, startAngle, 0);
-
-      // Text inside slice: same logic
-      const sliceArc = isTopHalf
-        ? arcD(sliceTextR, startAngle, endAngle, 1)
-        : arcD(sliceTextR, endAngle, startAngle, 0);
-
       return {
         piePath,
         fill: DOMEIN_COLORS[domain] || DOMEIN_COLORS.default,
         domain,
-        ringArc,
-        sliceArc,
+        midX,
+        midY,
       };
     });
 
-    // Single-domain: still generate ring arc for labelling
     if (N === 0) {
       slices.push({
         piePath: `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`,
         fill: DOMEIN_COLORS.default,
         domain: "default",
-        ringArc: arcD(ringTextR, -Math.PI / 2, Math.PI * 1.5, 1),
-        sliceArc: "",
+        midX: cx.toFixed(2),
+        midY: cy.toFixed(2),
       });
     }
+
+    // Font size: generous since we have a big circle
+    const fzSlice = N <= 1 ? 8 : N <= 2 ? 7 : N <= 4 ? 5.5 : 4.2;
 
     return {
       slices,
       hoofddomeinColor,
-      cx, cy, outerR, innerR, ringW, ringTextR, sliceTextR,
-      fzRing, fzSlice,
+      cx,
+      cy,
+      outerR,
+      innerR,
+      fzSlice,
       N: Math.max(N, 1),
     };
   }
@@ -1814,22 +1803,11 @@
             class="accordion-header"
             onclick={() => toggleSection("domein")}
           >
-            <span>Domein</span>
+            <span>Domein-waarde</span>
             <span class="icon">{openSections.domein ? "−" : "+"}</span>
           </button>
           {#if openSections.domein}
             <div class="accordion-content">
-              <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per domein</span>
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    checked={visualMode === "domein"}
-                    onchange={() => handleVisualToggle("domein")}
-                  />
-                  <span class="slider"></span>
-                </label>
-              </div>
               <hr class="separator" />
               {#each uniqueDomeinen as domein}
                 <div class="filter-item-row">
@@ -1867,22 +1845,6 @@
                   >
                     <i class="ph ph-fire"></i>
                   </button>
-                  <button
-                    class="choropleth-toggle-btn"
-                    class:active={activeChoroplethDomain === domein}
-                    onclick={() => {
-                      if (activeChoroplethDomain === domein) {
-                        activeChoroplethDomain = null;
-                      } else {
-                        activeChoroplethDomain = domein;
-                        activeHeatmapDomain = null;
-                      }
-                    }}
-                    title="Toon choropletenkaart voor dit domein"
-                    type="button"
-                  >
-                    <i class="ph ph-map-trifold"></i>
-                  </button>
                 </div>
               {/each}
             </div>
@@ -1894,22 +1856,11 @@
             class="accordion-header"
             onclick={() => toggleSection("koepel")}
           >
-            <span>Koepels</span>
+            <span>Netwerken</span>
             <span class="icon">{openSections.koepel ? "−" : "+"}</span>
           </button>
           {#if openSections.koepel}
             <div class="accordion-content">
-              <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per koepel</span>
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    checked={visualMode === "koepel"}
-                    onchange={() => handleVisualToggle("koepel")}
-                  />
-                  <span class="slider"></span>
-                </label>
-              </div>
               <hr class="separator" />
               {#each uniqueKoepels as koepel}
                 <label class="filter-item">
@@ -1920,11 +1871,6 @@
                       (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
                   />
                   <span class="filter-text">{koepel}</span>
-                  <span
-                    class="color-swatch"
-                    style="background-color: {KOEPEL_COLORS[koepel] ||
-                      KOEPEL_COLORS.default}"
-                  ></span>
                 </label>
               {/each}
             </div>
@@ -2002,7 +1948,10 @@
     </div>
 
     {#if selectedPlace}
-      {@const pd = getInfoPanelPieData(selectedPlace.domeinen, selectedPlace.hoofddomein)}
+      {@const pd = getInfoPanelPieData(
+        selectedPlace.domeinen,
+        selectedPlace.hoofddomein,
+      )}
       {@const pid = `pie-${selectedPlace.fid ?? 0}`}
       <div
         class="fixed-air-popup"
@@ -2043,18 +1992,22 @@
                 class="popup-domein-circle"
                 overflow="visible"
               >
-                <defs>
-                  {#each pd.slices as slice, i}
-                    <!-- Ring arc for text label on the border -->
-                    <path id="{pid}-ring-{i}" d={slice.ringArc} />
-                    <!-- Slice arc for text label inside the slice -->
-                    {#if pd.N > 1}
-                      <path id="{pid}-slice-{i}" d={slice.sliceArc} />
-                    {/if}
-                  {/each}
-                </defs>
+                {#each pd.slices as slice, i}
+                  {@const clipId = `${pid}-clip-${i}`}
 
-                <!-- ① Pizza slices (interactive) -->
+                  <!-- Outer border circle (hoofddomein color) -->
+                  {#if i === 0}
+                    <circle
+                      cx={pd.cx}
+                      cy={pd.cy}
+                      r={pd.outerR}
+                      fill={pd.hoofddomeinColor}
+                      class="outer-border-circle"
+                    />
+                  {/if}
+                {/each}
+
+                <!-- Clipped pie slices -->
                 {#each pd.slices as slice, i}
                   {#if pd.N === 1}
                     <circle
@@ -2063,7 +2016,8 @@
                       r={pd.innerR}
                       fill={slice.fill}
                       class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                      class:highlighted-slice={hoveredSliceDomain ===
+                        slice.domain}
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     />
@@ -2072,14 +2026,15 @@
                       d={slice.piePath}
                       fill={slice.fill}
                       class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                      class:highlighted-slice={hoveredSliceDomain ===
+                        slice.domain}
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     />
                   {/if}
                 {/each}
 
-                <!-- ② Divider lines between slices -->
+                <!-- Divider lines between slices -->
                 {#if pd.N > 1}
                   {#each pd.slices as _, i}
                     {@const a = -Math.PI / 2 + i * ((2 * Math.PI) / pd.N)}
@@ -2088,75 +2043,38 @@
                       y1={pd.cy}
                       x2={(pd.cx + pd.innerR * Math.cos(a)).toFixed(2)}
                       y2={(pd.cy + pd.innerR * Math.sin(a)).toFixed(2)}
-                      stroke="rgba(255,255,255,0.5)"
-                      stroke-width="0.5"
+                      stroke="rgba(255,255,255,0.6)"
+                      stroke-width="1"
                     />
                   {/each}
                 {/if}
 
-                <!-- ③ Outer ring (hoofddomein color) -->
-                <circle
-                  cx={pd.cx}
-                  cy={pd.cy}
-                  r={pd.ringTextR}
-                  fill="none"
-                  stroke={pd.hoofddomeinColor}
-                  stroke-width={pd.ringW}
-                  stroke-opacity="0.92"
-                />
-
-                <!-- ④ Text on the ring border, following the arc -->
-                {#each pd.slices as slice, i}
+                <!-- Domain labels centered inside each slice -->
+                {#each pd.slices as slice}
                   {#if slice.domain !== "default"}
                     <text
-                      font-size={pd.fzRing}
+                      x={slice.midX}
+                      y={slice.midY}
+                      font-size={pd.fzSlice}
                       font-weight="700"
                       fill="white"
                       text-anchor="middle"
-                      dominant-baseline="middle"
+                      dominant-baseline="central"
                       font-family="Inter, sans-serif"
-                      letter-spacing="0.2"
-                      style="text-transform: uppercase;"
-                      class:highlighted-ring-text={hoveredSliceDomain === slice.domain}
-                      onmouseenter={() => (hoveredSliceDomain = slice.domain)}
-                      onmouseleave={() => (hoveredSliceDomain = null)}
+                      letter-spacing="0.3"
+                      style="text-transform: uppercase; pointer-events: none;"
+                      class:highlighted-ring-text={hoveredSliceDomain ===
+                        slice.domain}>{slice.domain}</text
                     >
-                      <textPath href="#{pid}-ring-{i}" startOffset="50%">
-                        {slice.domain}
-                      </textPath>
-                    </text>
                   {/if}
                 {/each}
-
-                <!-- ⑤ Text inside each slice, following its arc -->
-                {#if pd.N > 1}
-                  {#each pd.slices as slice, i}
-                    {#if slice.domain !== "default"}
-                      <text
-                        font-size={pd.fzSlice}
-                        font-weight="600"
-                        fill="rgba(255,255,255,0.9)"
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        font-family="Inter, sans-serif"
-                        letter-spacing="0.15"
-                        style="text-transform: uppercase; pointer-events: none;"
-                        class:highlighted-ring-text={hoveredSliceDomain === slice.domain}
-                      >
-                        <textPath href="#{pid}-slice-{i}" startOffset="50%">
-                          {slice.domain}
-                        </textPath>
-                      </text>
-                    {/if}
-                  {/each}
-                {/if}
               </svg>
             </div>
           </div>
 
           <div class="popup-info-row koepel-row">
             {#if selectedPlace.koepels}
-              <span class="label">Koepel</span>
+              <span class="label">Netwerk</span>
               <div class="popup-tags">
                 {#each selectedPlace.koepels.split(";") as koepel}
                   {@const kName = koepel.trim()}
@@ -3459,7 +3377,9 @@
   :global(.marker-container:hover .air-marker) {
     transform: scale(calc(var(--marker-scale, 1) * 1.3)) translateZ(0);
     filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
-    transition: filter 0.15s ease-out, transform 0.12s ease-out;
+    transition:
+      filter 0.15s ease-out,
+      transform 0.12s ease-out;
   }
 
   :global(.air-marker.active-glow) {
@@ -4461,6 +4381,18 @@
   .pie-slice:hover,
   .pie-slice.highlighted-slice {
     filter: brightness(1.15) saturate(1.15);
+  }
+
+  .domains-circle-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .popup-domein-circle {
+    width: 110px;
+    height: 110px;
+    display: block;
   }
 
   .domains-tags-list {
