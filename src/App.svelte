@@ -203,35 +203,23 @@
 
   const createHexagonSVG = (
     domeinen,
-    borderColor,
-    isArea,
+    borderColor = "#ffffff",
+    isArea = false,
     isSelected = false,
+    size = 30,
   ) => {
     const domeinList = [
       ...new Set((domeinen || "").split(";").map((d) => d.trim())),
     ].filter(Boolean);
     const N = domeinList.length;
-    const colors = [];
+    const colors =
+      N === 0
+        ? [DOMEIN_COLORS.default]
+        : domeinList.map((d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default);
 
-    if (N === 0) {
-      for (let i = 0; i < 6; i++) colors.push(DOMEIN_COLORS.default);
-    } else {
-      const perDomain = Math.floor(6 / N);
-      const remainder = 6 % N;
-      domeinList.forEach((d, i) => {
-        let count = perDomain;
-        if (i === 0) count += remainder;
-        const color = DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
-        for (let j = 0; j < count; j++) {
-          colors.push(color);
-        }
-      });
-    }
-
-    const size = 30;
-    const R = 10;
     const cx = size / 2;
     const cy = size / 2;
+    const R = size * (10 / 30);
 
     const hexPoints = (radius) => {
       const pts = [];
@@ -246,32 +234,62 @@
     };
 
     const points = hexPoints(R);
+    const polygonPoints = points.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+    const clipId = "hex-clip-" + Math.random().toString(36).substring(2, 9);
 
-    let trianglesHtml = "";
-    for (let i = 0; i < 6; i++) {
-      const p1 = points[i];
-      const p2 = points[(i + 1) % 6];
-      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+    let slicesHtml = "";
+    const numSlices = colors.length;
+    if (numSlices === 1) {
+      slicesHtml = `<polygon points="${polygonPoints}" fill="${colors[0]}" />`;
+    } else {
+      const r_pie = R * 1.6;
+      const anglePerSlice = (2 * Math.PI) / numSlices;
+      let paths = [];
+      let dividers = [];
+      for (let i = 0; i < numSlices; i++) {
+        const startAngle = -Math.PI / 2 + i * anglePerSlice;
+        const endAngle = startAngle + anglePerSlice;
+        const x1 = cx + r_pie * Math.cos(startAngle);
+        const y1 = cy + r_pie * Math.sin(startAngle);
+        const x2 = cx + r_pie * Math.cos(endAngle);
+        const y2 = cy + r_pie * Math.sin(endAngle);
+        const largeArcFlag = anglePerSlice > Math.PI ? 1 : 0;
+        const d = `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r_pie.toFixed(2)} ${r_pie.toFixed(2)} 0 ${largeArcFlag} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+        paths.push(`<path d="${d}" fill="${colors[i]}" />`);
+
+        const divX = cx + R * Math.cos(startAngle);
+        const divY = cy + R * Math.sin(startAngle);
+        dividers.push(`<line x1="${cx}" y1="${cy}" x2="${divX.toFixed(2)}" y2="${divY.toFixed(2)}" stroke="#ffffff" stroke-width="1" />`);
+      }
+      slicesHtml = `
+        <defs>
+          <clipPath id="${clipId}">
+            <polygon points="${polygonPoints}" />
+          </clipPath>
+        </defs>
+        <g clip-path="url(#${clipId})">
+          ${paths.join("")}
+        </g>
+        ${dividers.join("")}
+      `;
     }
-
-    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
     const borderStroke = isSelected
       ? "#ffffff"
       : borderColor !== "#ffffff"
         ? borderColor
         : "#ffffff";
-    const borderWidth = isSelected ? 2.5 : 1.5;
+    const borderWidth = isSelected ? (size > 30 ? 3 : 2.5) : (size > 30 ? 2 : 1.5);
     const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderStroke}" stroke-width="${borderWidth}" stroke-linejoin="round" />`;
 
     if (isArea) {
       const rings = [
-        { r: 14, maxOp: 0.55, sw: 4.0 },
-        { r: 17.75, maxOp: 0.38, sw: 3.5 },
-        { r: 21, maxOp: 0.24, sw: 3.0 },
-        { r: 23.75, maxOp: 0.13, sw: 2.5 },
-        { r: 26, maxOp: 0.06, sw: 2.0 },
-        { r: 27.75, maxOp: 0.03, sw: 1.5 },
+        { r: R * 1.4, maxOp: 0.55, sw: 4.0 },
+        { r: R * 1.775, maxOp: 0.38, sw: 3.5 },
+        { r: R * 2.1, maxOp: 0.24, sw: 3.0 },
+        { r: R * 2.375, maxOp: 0.13, sw: 2.5 },
+        { r: R * 2.6, maxOp: 0.06, sw: 2.0 },
+        { r: R * 2.775, maxOp: 0.03, sw: 1.5 },
       ];
       let ringsHtml = "";
       rings.forEach(({ r, maxOp, sw }, ri) => {
@@ -280,12 +298,12 @@
 
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:0.85;overflow:visible;">
         ${ringsHtml}
-        ${trianglesHtml}
+        ${slicesHtml}
         ${borderHtml}
       </svg>`;
     } else {
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
-        ${trianglesHtml}
+        ${slicesHtml}
         ${borderHtml}
       </svg>`;
     }
@@ -1532,18 +1550,23 @@
 
           <div class="popup-info-row domains-row">
             <span class="label">Domeinen</span>
-            <div class="popup-tags">
-              {#each [...new Set((selectedPlace.domeinen || "")
-                    .split(";")
-                    .map((d) => d.trim()))] as d}
-                <span
-                  class="p-tag"
-                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                    DOMEIN_COLORS.default}"
-                >
-                  {d.trim()}
-                </span>
-              {/each}
+            <div class="domains-display">
+              <div class="domains-hex-wrapper">
+                {@html createHexagonSVG(selectedPlace.domeinen, "#ffffff", false, false, 46)}
+              </div>
+              <div class="domains-tags-list">
+                {#each [...new Set((selectedPlace.domeinen || "")
+                      .split(";")
+                      .map((d) => d.trim()))].filter(Boolean) as d}
+                  <span
+                    class="p-tag"
+                    style="background-color: {DOMEIN_COLORS[d] ||
+                      DOMEIN_COLORS.default};"
+                  >
+                    {d}
+                  </span>
+                {/each}
+              </div>
             </div>
           </div>
 
@@ -2301,6 +2324,27 @@
     color: #fff !important;
     font-size: 7.5px;
     padding: 1px 4px;
+  }
+  .domains-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+  }
+  .domains-hex-wrapper {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+  }
+  .domains-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
   }
   .popup-tags {
     display: flex;
