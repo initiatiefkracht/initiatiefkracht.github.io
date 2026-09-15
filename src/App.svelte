@@ -228,44 +228,49 @@
       });
     }
 
-    if (isArea) {
-      const size = 30;
-      const R = 10;
-      const cx = size / 2;
-      const cy = size / 2;
+    const size = 30;
+    const R = 10;
+    const cx = size / 2;
+    const cy = size / 2;
 
-      const hexPoints = (radius) => {
-        const pts = [];
-        for (let i = 0; i < 6; i++) {
-          const angle_rad = (Math.PI / 180) * (60 * i - 90);
-          pts.push({
-            x: cx + radius * Math.cos(angle_rad),
-            y: cy + radius * Math.sin(angle_rad),
-          });
-        }
-        return pts;
-      };
-
-      const points = hexPoints(R);
-
-      let trianglesHtml = "";
+    const hexPoints = (radius) => {
+      const pts = [];
       for (let i = 0; i < 6; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % 6];
-        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+        const angle_rad = (Math.PI / 180) * (60 * i - 90);
+        pts.push({
+          x: cx + radius * Math.cos(angle_rad),
+          y: cy + radius * Math.sin(angle_rad),
+        });
       }
+      return pts;
+    };
 
-      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderColor}" stroke-width="0" />`;
+    const points = hexPoints(R);
 
-      const bgCircleHtml = `<circle cx="${cx}" cy="${cy}" r="12" fill="#ffffff" />`;
+    let trianglesHtml = "";
+    for (let i = 0; i < 6; i++) {
+      const p1 = points[i];
+      const p2 = points[(i + 1) % 6];
+      trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
+    }
 
+    const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+    const borderStroke = isSelected
+      ? "#ffffff"
+      : borderColor !== "#ffffff"
+        ? borderColor
+        : "#ffffff";
+    const borderWidth = isSelected ? 2.5 : 1.5;
+    const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="${borderStroke}" stroke-width="${borderWidth}" stroke-linejoin="round" />`;
+
+    if (isArea) {
       const rings = [
-        { r: 14,    maxOp: 0.55, sw: 4.0 },
+        { r: 14, maxOp: 0.55, sw: 4.0 },
         { r: 17.75, maxOp: 0.38, sw: 3.5 },
-        { r: 21,    maxOp: 0.24, sw: 3.0 },
+        { r: 21, maxOp: 0.24, sw: 3.0 },
         { r: 23.75, maxOp: 0.13, sw: 2.5 },
-        { r: 26,    maxOp: 0.06, sw: 2.0 },
+        { r: 26, maxOp: 0.06, sw: 2.0 },
         { r: 27.75, maxOp: 0.03, sw: 1.5 },
       ];
       let ringsHtml = "";
@@ -275,58 +280,11 @@
 
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;opacity:0.85;overflow:visible;">
         ${ringsHtml}
-        ${bgCircleHtml}
         ${trianglesHtml}
         ${borderHtml}
       </svg>`;
     } else {
-      const size = 32;
-      const cx = 16;
-      const cy = 12;
-      const R = 6.2;
-
-      const hexPoints = (radius) => {
-        const pts = [];
-        for (let i = 0; i < 6; i++) {
-          const angle_rad = (Math.PI / 180) * (60 * i - 90);
-          pts.push({
-            x: cx + radius * Math.cos(angle_rad),
-            y: cy + radius * Math.sin(angle_rad),
-          });
-        }
-        return pts;
-      };
-
-      const points = hexPoints(R);
-
-      let trianglesHtml = "";
-      for (let i = 0; i < 6; i++) {
-        const p1 = points[i];
-        const p2 = points[(i + 1) % 6];
-        trianglesHtml += `<path d="M ${cx} ${cy} L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z" fill="${colors[i]}" />`;
-      }
-
-      const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-      const borderHtml = `<polygon points="${polygonPoints}" fill="none" stroke="#777" stroke-width="0.75" />`;
-
-      const pinFill = "#ffffff";
-      let pinStroke = "#ffffff";
-
-      if (borderColor === "#ffffff") {
-        pinStroke = "#ffffff";
-      }
-
-      if (isSelected) {
-        pinStroke = "#ffffff";
-      }
-
-      const strokeWidth = isSelected ? 1 : 0.5;
-
-      const pinPath = `M 16 2 C 10.5 2 6 6.5 6 12 C 6 18.5 16 30 16 30 C 16 30 26 18.5 26 12 C 26 6.5 21.5 2 16 2 Z`;
-
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;overflow:visible;">
-        <path d="${pinPath}" fill="${pinFill}" stroke="${pinStroke}" stroke-width="${strokeWidth}" />
-        <circle cx="${cx}" cy="${cy}" r="8.2" fill="#ffffff" />
         ${trianglesHtml}
         ${borderHtml}
       </svg>`;
@@ -1078,7 +1036,7 @@
 
       const m = new maplibregl.Marker({
         element: container,
-        anchor: isArea ? "center" : "bottom",
+        anchor: "center",
       })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
@@ -2371,16 +2329,16 @@
   }
 
   :global(.air-marker) {
-    min-width: 32px;
-    height: 32px;
+    min-width: 30px;
+    height: 30px;
     cursor: pointer;
-    filter: drop-shadow(0 2px 3px rgba(50, 67, 255, 0.4));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
     z-index: 200; /* Ensure points are above areas */
-    transform-origin: bottom;
+    transform-origin: center;
     transition:
       transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
       filter 0.25s ease;
