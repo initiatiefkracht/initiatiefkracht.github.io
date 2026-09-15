@@ -111,6 +111,9 @@
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
+      fadeDuration: 0,
+      maxTileCacheSize: 100,
+      renderWorldCopies: false,
       style: {
         version: 8,
         sources: {
@@ -120,6 +123,7 @@
               "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
             ],
             tileSize: 256,
+            maxzoom: 19,
             attribution:
               "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
           },
@@ -179,8 +183,8 @@
           const el = document.createElement("div");
           el.className = "temp-marker";
           el.innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff;">' +
-            '<i class="ph ph-plus" style="font-size: 11px; color: #ffffff; font-weight: 900;"></i>' +
+            '<div style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff;">' +
+            '<i class="ph ph-plus" style="font-size: 12px; color: #ffffff; font-weight: 900;"></i>' +
             "</div>";
           tempMarker = new maplibregl.Marker({ element: el })
             .setLngLat([lng, lat])
@@ -217,25 +221,22 @@
     let currentMarkerSize = null;
     const handleZoom = () => {
       const zoom = map.getZoom();
-      let size = 20;
-      if (zoom < 12.5) {
-        size = 10 + Math.max(0, zoom - 9.5) * (10 / 3.0);
-        size = Math.min(20, Math.max(10, size));
+      let size = 26;
+      if (zoom < 10.5) {
+        size = 16;
+      } else if (zoom < 12) {
+        size = 21;
+      } else {
+        size = 26;
       }
-      const roundedSize = Math.round(size);
-      if (roundedSize !== currentMarkerSize) {
-        currentMarkerSize = roundedSize;
-        const borderWidth = (1 + (roundedSize - 10) * 0.2).toFixed(1);
+      if (size !== currentMarkerSize) {
+        currentMarkerSize = size;
         if (mapContainer) {
-          mapContainer.style.setProperty("--marker-size", `${roundedSize}px`);
-          mapContainer.style.setProperty(
-            "--marker-border-width",
-            `${borderWidth}px`,
-          );
+          mapContainer.style.setProperty("--marker-size", `${size}px`);
         }
       }
     };
-    map.on("zoom", handleZoom);
+    map.on("zoomend", handleZoom);
     map.on("load", handleZoom);
     handleZoom();
   }
@@ -1069,8 +1070,8 @@
     if (isArea) {
       const cx = 50;
       const cy = 50;
-      const outerR = 36;
-      const innerR = 29;
+      const outerR = 41;
+      const innerR = 32;
 
       if (colors.length === 0) {
         return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
@@ -1123,24 +1124,24 @@
     }
 
     const dropletPath =
-      "M 50 92 C 40 80, 18 63, 18 40 A 32 32 0 1 1 82 40 C 82 63, 60 80, 50 92 Z";
+      "M 50 93 C 37 81, 12 64, 12 40 A 38 38 0 1 1 88 40 C 88 64, 63 81, 50 93 Z";
+    const r = 32; // Radius of the inner circle (identical to area dot innerR = 32)
+    const cx = 50; // Center of the circular part
+    const cy = 40; // Center of the circular part
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="50" cy="40" r="29" fill="#5d69fb" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="50" cy="40" r="29" fill="${colors[0]}" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" class="inner-circle" />
       </svg>`;
     }
 
-    const r = 29; // Radius of the inner circle
-    const cx = 50; // Center of the circular part
-    const cy = 40; // Center of the circular part
     let paths = [];
     const totalSlices = colors.length;
 
@@ -1167,14 +1168,14 @@
     return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
       <defs>
         <clipPath id="${clipId}">
-          <circle cx="50" cy="40" r="29" />
+          <circle cx="${cx}" cy="${cy}" r="${r}" />
         </clipPath>
       </defs>
       <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
       <g clip-path="url(#${clipId})">
         ${paths.join("")}
       </g>
-      <circle cx="50" cy="40" r="29" fill="none" class="inner-circle" />
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" class="inner-circle" />
     </svg>`;
   }
 
@@ -3242,15 +3243,17 @@
 
   :global(.marker-container) {
     z-index: 100;
+    will-change: transform;
+    pointer-events: auto;
   }
   :global(.marker-container:hover) {
     z-index: 1000;
   }
 
   :global(.air-marker) {
-    width: var(--marker-size, 29px);
-    min-width: var(--marker-size, 29px);
-    height: var(--marker-size, 29px);
+    width: var(--marker-size, 26px);
+    min-width: var(--marker-size, 26px);
+    height: var(--marker-size, 26px);
     border: none;
     border-radius: 0;
     cursor: pointer;
@@ -3261,11 +3264,12 @@
     padding: 0;
     overflow: visible;
     box-sizing: border-box;
-    transform-origin: 50% 92%;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
-    transition:
-      transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-      filter 0.25s ease;
+    transform-origin: 50% 93%;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.28));
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    transition: transform 0.15s ease-out;
   }
 
   :global(.air-marker .outer-droplet) {
@@ -3275,53 +3279,46 @@
   }
 
   :global(.air-marker .inner-circle) {
-    /* stroke: var(--marker-border-color, #5d69fb);
-    stroke-width: calc(
-      var(--marker-border-width, 3px) * 100 / var(--marker-size, 20)
-    ); */
-    transition:
-      stroke 0.25s ease,
-      stroke-width 0.25s ease;
   }
 
   :global(.air-marker.thin-border .inner-circle) {
     stroke: #ffffff !important;
-    stroke-width: calc(1px * 100 / var(--marker-size, 29)) !important;
+    stroke-width: 1.5px !important;
   }
 
   :global(.air-marker i) {
-    font-size: calc(var(--marker-size, 29px) * 0.55);
+    font-size: calc(var(--marker-size, 26px) * 0.55);
     line-height: 1;
   }
 
   :global(.marker-container:hover .air-marker) {
-    transform: scale(1.3);
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+    transform: scale(1.3) translateZ(0);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
   }
 
   :global(.air-marker.active-glow) {
-    transform: scale(1.3);
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    transform: scale(1.3) translateZ(0);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
   }
 
   :global(.air-marker.active-glow .inner-circle) {
-    /* stroke: #6458f5 !important; */
-    stroke-width: calc(2px * 100 / var(--marker-size, 29)) !important;
+    stroke-width: 2px !important;
   }
 
   :global(.air-area-marker) {
-    width: var(--marker-size, 25px);
-    min-width: var(--marker-size, 25px);
-    height: var(--marker-size, 25px);
+    width: var(--marker-size, 26px);
+    min-width: var(--marker-size, 26px);
+    height: var(--marker-size, 26px);
     border-radius: 0;
     transform-origin: 50% 50% !important;
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4))
-      drop-shadow(0 0 8px rgba(100, 88, 245, 0.1))
-      drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
   }
 
   :global(.air-area-marker i) {
-    font-size: calc(var(--marker-size, 25px) * 0.5);
+    font-size: calc(var(--marker-size, 26px) * 0.5);
   }
   .logos-section {
     display: flex;
