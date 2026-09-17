@@ -137,8 +137,8 @@
             source: "satellite-source",
             paint: {
               "raster-saturation": -0.9,
-              "raster-brightness-max": 1,
-              "raster-opacity": 0.6,
+              "raster-brightness-max": 1.0,
+              "raster-opacity": 0.8,
             },
           },
         ],
@@ -222,15 +222,18 @@
     // Smooth continuous marker scaling via CSS transform (GPU-composited, no reflow)
     // Base marker size is fixed at 26px; we just scale it with transform.
     const BASE_ZOOM = 12.5;
-    const MIN_SCALE = 0.55;  // at zoom ~9
-    const MAX_SCALE = 1.8;   // at zoom ~16
-    const ZOOM_REF = 12.5;   // scale = 1.0 at this zoom
+    const MIN_SCALE = 0.55; // at zoom ~9
+    const MAX_SCALE = 1.8; // at zoom ~16
+    const ZOOM_REF = 12.5; // scale = 1.0 at this zoom
 
     let rafId = null;
     const updateMarkerScale = () => {
       const zoom = map.getZoom();
       // Linear interpolation: every zoom step = 15% size change (same as map tile doubling)
-      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)));
+      const scale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)),
+      );
       if (mapContainer) {
         mapContainer.style.setProperty("--marker-scale", scale.toFixed(4));
       }
@@ -1244,12 +1247,13 @@
     ].filter(Boolean);
     const N = domeinList.length;
 
-    const cx = 50, cy = 50;
-    const outerR = 47;        // outer edge of ring
-    const ringW = 11;         // ring stroke width
+    const cx = 50,
+      cy = 50;
+    const outerR = 47; // outer edge of ring
+    const ringW = 11; // ring stroke width
     const innerR = outerR - ringW; // = 36, inner edge of ring = pie outer radius
     const ringTextR = outerR - ringW / 2; // = 41.5, midpoint of ring
-    const sliceTextR = innerR * 0.58;     // ~20.9, midpoint inside pie
+    const sliceTextR = innerR * 0.58; // ~20.9, midpoint inside pie
 
     const hoofddomeinColor =
       DOMEIN_COLORS[(hoofddomein || "").trim()] ||
@@ -1325,8 +1329,15 @@
     return {
       slices,
       hoofddomeinColor,
-      cx, cy, outerR, innerR, ringW, ringTextR, sliceTextR,
-      fzRing, fzSlice,
+      cx,
+      cy,
+      outerR,
+      innerR,
+      ringW,
+      ringTextR,
+      sliceTextR,
+      fzRing,
+      fzSlice,
       N: Math.max(N, 1),
     };
   }
@@ -2002,7 +2013,10 @@
     </div>
 
     {#if selectedPlace}
-      {@const pd = getInfoPanelPieData(selectedPlace.domeinen, selectedPlace.hoofddomein)}
+      {@const pd = getInfoPanelPieData(
+        selectedPlace.domeinen,
+        selectedPlace.hoofddomein,
+      )}
       {@const pid = `pie-${selectedPlace.fid ?? 0}`}
       <div
         class="fixed-air-popup"
@@ -2063,7 +2077,8 @@
                       r={pd.innerR}
                       fill={slice.fill}
                       class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                      class:highlighted-slice={hoveredSliceDomain ===
+                        slice.domain}
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     />
@@ -2072,7 +2087,8 @@
                       d={slice.piePath}
                       fill={slice.fill}
                       class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain === slice.domain}
+                      class:highlighted-slice={hoveredSliceDomain ===
+                        slice.domain}
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     />
@@ -2117,7 +2133,8 @@
                       font-family="Inter, sans-serif"
                       letter-spacing="0.2"
                       style="text-transform: uppercase;"
-                      class:highlighted-ring-text={hoveredSliceDomain === slice.domain}
+                      class:highlighted-ring-text={hoveredSliceDomain ===
+                        slice.domain}
                       onmouseenter={() => (hoveredSliceDomain = slice.domain)}
                       onmouseleave={() => (hoveredSliceDomain = null)}
                     >
@@ -2141,7 +2158,8 @@
                         font-family="Inter, sans-serif"
                         letter-spacing="0.15"
                         style="text-transform: uppercase; pointer-events: none;"
-                        class:highlighted-ring-text={hoveredSliceDomain === slice.domain}
+                        class:highlighted-ring-text={hoveredSliceDomain ===
+                          slice.domain}
                       >
                         <textPath href="#{pid}-slice-{i}" startOffset="50%">
                           {slice.domain}
@@ -3429,7 +3447,7 @@
     overflow: visible;
     box-sizing: border-box;
     transform-origin: 50% 93%;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.28));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
     will-change: transform;
     backface-visibility: hidden;
     /* Scale continuously from --marker-scale set every rAF during zoom */
@@ -3459,7 +3477,9 @@
   :global(.marker-container:hover .air-marker) {
     transform: scale(calc(var(--marker-scale, 1) * 1.3)) translateZ(0);
     filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
-    transition: filter 0.15s ease-out, transform 0.12s ease-out;
+    transition:
+      filter 0.15s ease-out,
+      transform 0.12s ease-out;
   }
 
   :global(.air-marker.active-glow) {
@@ -3477,7 +3497,7 @@
     height: 26px;
     border-radius: 0;
     transform-origin: 50% 50% !important;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
     will-change: transform;
     backface-visibility: hidden;
     transform: scale(var(--marker-scale, 1)) translateZ(0);
