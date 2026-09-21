@@ -186,8 +186,8 @@
             },
             paint: {
               "raster-saturation": -1,
-              "raster-contrast": 0.6,
-              "raster-brightness-min": 0.7,
+              "raster-contrast": 0.2,
+              "raster-brightness-min": 0.3,
               "raster-brightness-max": 1.0,
             },
           },
@@ -1125,13 +1125,13 @@
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
+        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
         <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
+        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
         <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
@@ -1165,7 +1165,7 @@
           <circle cx="${cx}" cy="${cy}" r="${r}" />
         </clipPath>
       </defs>
-      <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
+      <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
       <g clip-path="url(#${clipId})">
         ${paths.join("")}
       </g>
@@ -3292,8 +3292,10 @@
   }
 
   :global(.air-marker .outer-droplet) {
-    stroke: none;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    stroke: #ffffff;
+    stroke-width: 5px;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   }
 
   :global(.air-marker .inner-circle) {
