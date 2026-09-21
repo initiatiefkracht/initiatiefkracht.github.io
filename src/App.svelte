@@ -3,21 +3,30 @@
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
+  import { Protocol } from "pmtiles";
+  import { getProtomapsWhiteLayers } from "./lib/basemap/index.js";
+
+  try {
+    const protocol = new Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+  } catch {
+    // Protocol already registered in environment
+  }
 
   let mapContainer = $state();
   let map = $state();
   let mapLoaded = $state(false);
+  let activeBasemap = $state("satellite");
+  const protomapsLayers = getProtomapsWhiteLayers("nl");
   let allPlaces = $state([]);
   let markers = [];
   let markerMap = new Map();
   let visualMode = $state("default");
   let activeHeatmapDomain = $state(null);
-  let activeChoroplethDomain = $state(null);
   let allGeoFeatures = $state([]);
-  let currentOpacities = new Map();
-  let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
+  let hoveredPlace = $state(null);
   let hoveredSliceDomain = $state(null);
   let isSelectingLocation = $state(false);
   let tempMarker = null;
@@ -108,6 +117,27 @@
   let isMobile = $state(false);
   let showQrBlock = $state(true);
 
+  function setBasemap(mode) {
+    if (activeBasemap === mode) return;
+    activeBasemap = mode;
+    if (!map) return;
+
+    const isSat = mode === "satellite";
+    if (map.getLayer("pdok-luchtfoto-layer")) {
+      map.setLayoutProperty(
+        "pdok-luchtfoto-layer",
+        "visibility",
+        isSat ? "visible" : "none",
+      );
+    }
+    const protoVis = isSat ? "none" : "visible";
+    for (const l of protomapsLayers) {
+      if (map.getLayer(l.id)) {
+        map.setLayoutProperty(l.id, "visibility", protoVis);
+      }
+    }
+  }
+
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
@@ -118,27 +148,47 @@
       pitchWithRotate: false,
       style: {
         version: 8,
+        glyphs:
+          "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
+        sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/white",
         sources: {
-          "satellite-source": {
+          protomaps: {
+            type: "vector",
+            url: "https://api.protomaps.com/tiles/v4.json?key=ca7652ec836f269a",
+            attribution:
+              '© <a href="https://openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a> / <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a>',
+          },
+          "pdok-luchtfoto": {
             type: "raster",
             tiles: [
-              "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+              "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/OGC:1.0:GoogleMapsCompatible/{z}/{x}/{y}.jpeg",
             ],
             tileSize: 256,
             maxzoom: 19,
             attribution:
-              "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+              '© <a href="https://www.pdok.nl/" target="_blank" rel="noopener">PDOK</a> / Luchtfoto',
           },
         },
         layers: [
+          ...protomapsLayers.map((layer) => ({
+            ...layer,
+            layout: {
+              ...layer.layout,
+              visibility: activeBasemap === "protomaps" ? "visible" : "none",
+            },
+          })),
           {
-            id: "satellite-layer",
+            id: "pdok-luchtfoto-layer",
             type: "raster",
-            source: "satellite-source",
+            source: "pdok-luchtfoto",
+            layout: {
+              visibility: activeBasemap === "satellite" ? "visible" : "none",
+            },
             paint: {
-              "raster-saturation": -0.9,
+              "raster-saturation": -1,
+              "raster-contrast": 0.6,
+              "raster-brightness-min": 0.7,
               "raster-brightness-max": 1.0,
-              "raster-opacity": 0.8,
             },
           },
         ],
@@ -208,43 +258,57 @@
         source: "rotterdam-buurten",
         paint: {
           "fill-color": "#5d69fb",
-          "fill-opacity": [
-            "coalesce",
-            ["feature-state", "highlightOpacity"],
-            0,
-          ],
+          "fill-opacity": 0,
         },
       });
 
       mapLoaded = true;
     });
 
-    // Smooth continuous marker scaling via CSS transform (GPU-composited, no reflow)
-    // Base marker size is fixed at 26px; we just scale it with transform.
-    const BASE_ZOOM = 12.5;
+    // Smooth continuous marker scaling via a single shared stylesheet rule.
+    // Updating one CSS rule is far cheaper than setting a custom property on the
+    // container (which triggers inherited-variable resolution for every marker).
     const MIN_SCALE = 0.55; // at zoom ~9
     const MAX_SCALE = 1.8; // at zoom ~16
     const ZOOM_REF = 12.5; // scale = 1.0 at this zoom
 
-    let rafId = null;
+    // Create a dedicated adoptable stylesheet so we can update it with replaceSync
+    // (zero DOM mutations, no style cascade triggered on any element).
+    const markerSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, markerSheet];
+
+    const applyMarkerScale = (scale) => {
+      const s = scale.toFixed(4);
+      markerSheet.replaceSync(`
+        .air-marker {
+          transform: scale(${s}) translateZ(0);
+        }
+        .air-area-marker {
+          transform: scale(${s}) translateZ(0);
+        }
+        .marker-container:hover .air-marker {
+          transform: scale(calc(${s} * 1.3)) translateZ(0);
+        }
+        .air-marker.active-glow {
+          transform: scale(calc(${s} * 1.3)) translateZ(0);
+        }
+      `);
+    };
+
     const updateMarkerScale = () => {
-      const zoom = map.getZoom();
-      // Linear interpolation: every zoom step = 15% size change (same as map tile doubling)
+      // Wrap map access in untrack() to prevent Svelte state tracking on zoom frames
+      const zoom = untrack(() => map?.getZoom());
+      if (zoom === undefined) return;
+
       const scale = Math.min(
         MAX_SCALE,
         Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)),
       );
-      if (mapContainer) {
-        mapContainer.style.setProperty("--marker-scale", scale.toFixed(4));
-      }
-      rafId = null;
+      applyMarkerScale(scale);
     };
 
-    const onZoom = () => {
-      if (!rafId) rafId = requestAnimationFrame(updateMarkerScale);
-    };
-
-    map.on("zoom", onZoom);
+    // MapLibre fires "zoom" inside its own rAF loop — no need to add another rAF.
+    map.on("zoom", updateMarkerScale);
     map.on("load", updateMarkerScale);
     updateMarkerScale();
   }
@@ -256,18 +320,17 @@
   const POINT_ZOOM = 15.5;
   const AREA_ZOOM = 13;
   const LARGE_AREA_ZOOM = 11;
-  const MAX_CHOROPLETH_NEIGHBORHOODS = 15;
 
   const DOMEIN_COLORS = {
-    Wonen: "#f44764",
-    Welzijn: "#ffeb78",
-    Cultuur: "#ffa669",
-    Klimaat: "#6bc0c9",
-    Voedsel: "#7bc16b",
-    Groen: "#a3d1ab",
-    Circulair: "#fac559",
-    Mobiliteit: "#ff8086",
-    Energie: "#ffa6e1",
+    Wonen: "#E63114",
+    Welzijn: "#F5BD02",
+    Cultuur: "#FF6D1D",
+    Klimaat: "#AECCE6",
+    Voedsel: "#377E42",
+    Groen: "#C0DA81",
+    Circulair: "#D2B2F5",
+    Mobiliteit: "#00ACC1",
+    Energie: "#FE7EAE",
     default: "#5d69fb",
   };
 
@@ -986,111 +1049,35 @@
     document.body.removeChild(link);
   }
 
-  let highlightedFeatureIds = new Set();
-  $effect(() => {
-    if (!mapLoaded || !map) return;
-
-    const areas = filteredPlaces.filter((p) => p.location_type === "area");
-    const hoveredSet = new Set(hoveredAreaGebieden);
-    const clickedSet = new Set(clickedAreaGebieden);
-
-    const nextHighlightedIds = new Set();
-    areas.forEach((p) => {
-      const gebieden = p.gebied.split(";").map((g) => g.trim());
-      gebieden.forEach((gebied) => {
-        if (hoveredSet.has(gebied) || clickedSet.has(gebied)) {
-          const ids = buurtToFeatureIds.get(gebied) || [];
-          ids.forEach((id) => nextHighlightedIds.add(id));
-        }
-      });
-    });
-
-    highlightedFeatureIds.forEach((id) => {
-      if (!nextHighlightedIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: false },
-        );
-      }
-    });
-
-    nextHighlightedIds.forEach((id) => {
-      if (!highlightedFeatureIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: true },
-        );
-      }
-    });
-
-    highlightedFeatureIds = nextHighlightedIds;
-
-    const targetOpacities = new Map();
-    const duration = 400;
-    const maxOpacity = 0.3;
-
-    nextHighlightedIds.forEach((id) => targetOpacities.set(id, maxOpacity));
-
-    currentOpacities.forEach((_, id) => {
-      if (!targetOpacities.has(id)) {
-        targetOpacities.set(id, 0);
-      }
-    });
-
-    if (opacityAnimationFrame) cancelAnimationFrame(opacityAnimationFrame);
-
-    const startTime = performance.now();
-    const startOpacities = new Map(currentOpacities);
-
-    function animateOpacity(time) {
-      const progress = Math.min((time - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 2);
-
-      let needsNextFrame = false;
-
-      targetOpacities.forEach((targetVal, id) => {
-        const startVal = startOpacities.get(id) || 0;
-        const currentVal = startVal + (targetVal - startVal) * ease;
-
-        currentOpacities.set(id, currentVal);
-
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlightOpacity: currentVal },
-        );
-
-        if (progress < 1) {
-          needsNextFrame = true;
-        } else if (targetVal === 0) {
-          currentOpacities.delete(id);
-        }
-      });
-
-      if (needsNextFrame) {
-        opacityAnimationFrame = requestAnimationFrame(animateOpacity);
-      }
-    }
-
-    opacityAnimationFrame = requestAnimationFrame(animateOpacity);
-  });
-
   function getPieChartSvg(colors, isArea = false, outerColor = "#ffffff") {
     if (isArea) {
       const cx = 50;
       const cy = 50;
       const outerR = 41;
       const innerR = 32;
+      const clipId = "area-clip-" + Math.random().toString(36).substring(2, 9);
+
+      const rings = `
+        <g class="area-rings-group">
+          <circle cx="${cx}" cy="${cy}" r="60" fill="${outerColor}" stroke="none" stroke-width="8.0" fill-opacity="0.6" class="area-ring area-ring-1" />
+          <circle cx="${cx}" cy="${cy}" r="90" fill="${outerColor}" stroke="none" stroke-width="5.0" fill-opacity="0.5" class="area-ring area-ring-2" />
+          <circle cx="${cx}" cy="${cy}" r="140" fill="${outerColor}" stroke="none" stroke-width="2.0" fill-opacity="0.4" class="area-ring area-ring-3" />
+        </g>
+      `;
+      const outerCircle = `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />`;
 
       if (colors.length === 0) {
         return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-          <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" class="inner-circle" />
+          ${rings}
+          ${outerCircle}
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
         </svg>`;
       }
       if (colors.length === 1) {
         return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-          <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" class="inner-circle" />
+          ${rings}
+          ${outerCircle}
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
         </svg>`;
       }
 
@@ -1115,38 +1102,37 @@
         paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
       }
 
-      const clipId = "area-clip-" + Math.random().toString(36).substring(2, 9);
-
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <defs>
           <clipPath id="${clipId}">
             <circle cx="${cx}" cy="${cy}" r="${innerR}" />
           </clipPath>
         </defs>
-        <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />
+        ${rings}
+        ${outerCircle}
         <g clip-path="url(#${clipId})">
           ${paths.join("")}
         </g>
-        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
 
     const dropletPath =
-      "M 50 93 C 37 81, 12 64, 12 40 A 38 38 0 1 1 88 40 C 88 64, 63 81, 50 93 Z";
-    const r = 32; // Radius of the inner circle (identical to area dot innerR = 32)
+      "M 50 97 C 36 83, 11 60, 11 37 A 39 39 0 1 1 89 37 C 89 60, 64 83, 50 97 Z";
+    const r = 31; // Radius of the inner circle
     const cx = 50; // Center of the circular part
-    const cy = 40; // Center of the circular part
+    const cy = 37; // Center of the circular part
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
         <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" class="inner-circle" />
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
 
@@ -1183,7 +1169,7 @@
       <g clip-path="url(#${clipId})">
         ${paths.join("")}
       </g>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" class="inner-circle" />
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
     </svg>`;
   }
 
@@ -1238,8 +1224,8 @@
 
   /**
    * Computes all geometry needed for the info-panel circle visualization:
-   * - Outer ring colored by hoofddomein with curving text labels
-   * - Inner pie slices with curving text labels
+   * - Outer ring: solid hoofddomein color, single centered label
+   * - Inner pie slices: one per domein, each with its color and label
    */
   function getInfoPanelPieData(domeinen, hoofddomein) {
     const domeinList = [
@@ -1250,21 +1236,21 @@
     const cx = 50,
       cy = 50;
     const outerR = 47; // outer edge of ring
-    const ringW = 11; // ring stroke width
-    const innerR = outerR - ringW; // = 36, inner edge of ring = pie outer radius
-    const ringTextR = outerR - ringW / 2; // = 41.5, midpoint of ring
-    const sliceTextR = innerR * 0.58; // ~20.9, midpoint inside pie
+    const ringW = 12; // ring stroke width
+    const innerR = outerR - ringW; // inner edge of ring = pie outer radius
+    const ringTextR = outerR - ringW / 2; // midpoint of ring, for text arc
+    const sliceTextR = innerR * 0.58; // midpoint inside pie
 
+    // Resolve hoofddomein: explicit field first, else first domein, else default
+    const hoofddomeinName = (hoofddomein || "").trim() || domeinList[0] || "";
     const hoofddomeinColor =
-      DOMEIN_COLORS[(hoofddomein || "").trim()] ||
-      DOMEIN_COLORS[domeinList[0]] ||
-      "#5d69fb";
+      DOMEIN_COLORS[hoofddomeinName] || DOMEIN_COLORS.default;
 
     // Font sizes based on number of domains
-    const fzRing = N <= 2 ? 5.5 : N <= 4 ? 4.5 : 3.5;
+    const fzRing = 5.0; // fixed — ring always shows only one word
     const fzSlice = N <= 2 ? 4.5 : N <= 4 ? 3.8 : 3.0;
 
-    // Arc path helper: arc only (no fill), used as textPath reference
+    // Arc path helper (no fill, used as <textPath> reference)
     const arcD = (r, a1, a2, sweep) => {
       const x1 = cx + r * Math.cos(a1);
       const y1 = cy + r * Math.sin(a1);
@@ -1273,6 +1259,12 @@
       const large = Math.abs(a2 - a1) > Math.PI ? 1 : 0;
       return `M${x1.toFixed(3)},${y1.toFixed(3)} A${r},${r} 0 ${large} ${sweep} ${x2.toFixed(3)},${y2.toFixed(3)}`;
     };
+
+    // Top-half semicircle arc (9 o'clock → 3 o'clock, clockwise).
+    // A full-circle path has identical start/end points and SVG won't render
+    // text on it. A semicircle is a proper open path; startOffset="50%"
+    // centres the text at the 12 o'clock position of the ring.
+    const ringArc = arcD(ringTextR, Math.PI, 0, 1);
 
     const anglePerSlice = (2 * Math.PI) / Math.max(N, 1);
 
@@ -1284,7 +1276,6 @@
       // Pie slice path
       let piePath;
       if (N === 1) {
-        // Full circle as pie
         piePath = `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`;
       } else {
         const x1 = (cx + innerR * Math.cos(startAngle)).toFixed(3);
@@ -1295,13 +1286,8 @@
         piePath = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR},${innerR} 0 ${laf} 1 ${x2} ${y2} Z`;
       }
 
-      // Text on ring: clockwise for upper-half midpoints, counter-clockwise for lower
+      // Slice text arc — clockwise top-half, counter-clockwise bottom-half
       const isTopHalf = Math.sin(midAngle) <= 0;
-      const ringArc = isTopHalf
-        ? arcD(ringTextR, startAngle, endAngle, 1)
-        : arcD(ringTextR, endAngle, startAngle, 0);
-
-      // Text inside slice: same logic
       const sliceArc = isTopHalf
         ? arcD(sliceTextR, startAngle, endAngle, 1)
         : arcD(sliceTextR, endAngle, startAngle, 0);
@@ -1310,25 +1296,25 @@
         piePath,
         fill: DOMEIN_COLORS[domain] || DOMEIN_COLORS.default,
         domain,
-        ringArc,
         sliceArc,
       };
     });
 
-    // Single-domain: still generate ring arc for labelling
+    // Fallback when no domeinen at all
     if (N === 0) {
       slices.push({
         piePath: `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`,
         fill: DOMEIN_COLORS.default,
-        domain: "default",
-        ringArc: arcD(ringTextR, -Math.PI / 2, Math.PI * 1.5, 1),
+        domain: "",
         sliceArc: "",
       });
     }
 
     return {
       slices,
+      hoofddomeinName,
       hoofddomeinColor,
+      ringArc,
       cx,
       cy,
       outerR,
@@ -1345,7 +1331,7 @@
   $effect(() => {
     if (!map) return;
 
-    if (activeHeatmapDomain || activeChoroplethDomain) {
+    if (activeHeatmapDomain) {
       markers.forEach((m) => m.remove());
       markers = [];
       markerMap.clear();
@@ -1408,10 +1394,12 @@
           .split(";")
           .map((g) => g.trim());
         el.addEventListener("mouseenter", () => {
+          hoveredPlace = place;
           hoveredAreaGebieden = areaGebieden.filter(Boolean);
         });
 
         el.addEventListener("mouseleave", () => {
+          hoveredPlace = null;
           hoveredAreaGebieden = [];
         });
       }
@@ -1449,8 +1437,7 @@
 
   let wasHeatmapActive = false;
   $effect(() => {
-    const isActive =
-      activeHeatmapDomain !== null || activeChoroplethDomain !== null;
+    const isActive = activeHeatmapDomain !== null;
     if (isActive && !wasHeatmapActive && map) {
       map.flyTo({
         center: [4.47, 51.915],
@@ -1590,97 +1577,6 @@
     };
   });
 
-  $effect(() => {
-    if (!mapLoaded || !map) return;
-
-    const counts = new Map();
-    if (activeChoroplethDomain) {
-      allPlaces.forEach((place) => {
-        const domeinen = (place.domeinen || "")
-          .split(";")
-          .map((d) => d.trim())
-          .filter(Boolean);
-        if (domeinen.includes(activeChoroplethDomain)) {
-          const gebieden = (place.gebied || "")
-            .split(";")
-            .map((g) => g.trim())
-            .filter(Boolean);
-          if (gebieden.length <= MAX_CHOROPLETH_NEIGHBORHOODS) {
-            gebieden.forEach((buurt) => {
-              counts.set(buurt, (counts.get(buurt) || 0) + 1);
-            });
-          }
-        }
-      });
-    }
-
-    allGeoFeatures.forEach((feature) => {
-      const name = feature.properties.buurtnaam;
-      const count = name ? counts.get(name) || 0 : 0;
-      map.setFeatureState(
-        { source: "rotterdam-buurten", id: feature.id },
-        { choroplethCount: count },
-      );
-    });
-
-    if (activeChoroplethDomain) {
-      const color =
-        DOMEIN_COLORS[activeChoroplethDomain] || DOMEIN_COLORS.default;
-      map.setPaintProperty("buurten-fill", "fill-color", color);
-      map.setPaintProperty(
-        "buurten-fill",
-        "fill-opacity",
-        globalMaxCount > 1
-          ? [
-              "interpolate",
-              ["linear"],
-              ["sqrt", ["coalesce", ["feature-state", "choroplethCount"], 0]],
-              0,
-              0,
-              1,
-              0.2,
-              Math.sqrt(globalMaxCount),
-              0.85,
-            ]
-          : [
-              "interpolate",
-              ["linear"],
-              ["coalesce", ["feature-state", "choroplethCount"], 0],
-              0,
-              0,
-              1,
-              0.5,
-            ],
-      );
-    } else {
-      map.setPaintProperty("buurten-fill", "fill-color", "#5d69fb");
-      map.setPaintProperty("buurten-fill", "fill-opacity", [
-        "coalesce",
-        ["feature-state", "highlightOpacity"],
-        0,
-      ]);
-    }
-
-    return () => {
-      if (map) {
-        allGeoFeatures.forEach((feature) => {
-          map.setFeatureState(
-            { source: "rotterdam-buurten", id: feature.id },
-            { choroplethCount: 0 },
-          );
-        });
-        if (map.getLayer("buurten-fill")) {
-          map.setPaintProperty("buurten-fill", "fill-color", "#5d69fb");
-          map.setPaintProperty("buurten-fill", "fill-opacity", [
-            "coalesce",
-            ["feature-state", "highlightOpacity"],
-            0,
-          ]);
-        }
-      }
-    };
-  });
-
   function toggleFilter(list, value) {
     if (list.includes(value)) return list.filter((i) => i !== value);
     return [...list, value];
@@ -1708,35 +1604,6 @@
       }
     });
     return [...gebieden].sort();
-  });
-
-  let globalMaxCount = $derived.by(() => {
-    let max = 1;
-    const domains = Object.keys(DOMEIN_COLORS).filter((d) => d !== "default");
-    domains.forEach((domain) => {
-      const counts = new Map();
-      allPlaces.forEach((place) => {
-        const domeinen = (place.domeinen || "")
-          .split(";")
-          .map((d) => d.trim())
-          .filter(Boolean);
-        if (domeinen.includes(domain)) {
-          const gebieden = (place.gebied || "")
-            .split(";")
-            .map((g) => g.trim())
-            .filter(Boolean);
-          if (gebieden.length <= MAX_CHOROPLETH_NEIGHBORHOODS) {
-            gebieden.forEach((buurt) => {
-              counts.set(buurt, (counts.get(buurt) || 0) + 1);
-            });
-          }
-        }
-      });
-      counts.forEach((c) => {
-        if (c > max) max = c;
-      });
-    });
-    return max;
   });
 </script>
 
@@ -1825,13 +1692,13 @@
             class="accordion-header"
             onclick={() => toggleSection("domein")}
           >
-            <span>Domein</span>
+            <span>Domein-waarden</span>
             <span class="icon">{openSections.domein ? "−" : "+"}</span>
           </button>
           {#if openSections.domein}
             <div class="accordion-content">
               <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per domein</span>
+                <span class="toggle-text">Toon kleuren per domein-waarde</span>
                 <label class="switch">
                   <input
                     type="checkbox"
@@ -1870,29 +1737,12 @@
                         activeHeatmapDomain = null;
                       } else {
                         activeHeatmapDomain = domein;
-                        activeChoroplethDomain = null;
                       }
                     }}
                     title="Toon heatmap voor dit domein"
                     type="button"
                   >
                     <i class="ph ph-fire"></i>
-                  </button>
-                  <button
-                    class="choropleth-toggle-btn"
-                    class:active={activeChoroplethDomain === domein}
-                    onclick={() => {
-                      if (activeChoroplethDomain === domein) {
-                        activeChoroplethDomain = null;
-                      } else {
-                        activeChoroplethDomain = domein;
-                        activeHeatmapDomain = null;
-                      }
-                    }}
-                    title="Toon choropletenkaart voor dit domein"
-                    type="button"
-                  >
-                    <i class="ph ph-map-trifold"></i>
                   </button>
                 </div>
               {/each}
@@ -1910,17 +1760,6 @@
           </button>
           {#if openSections.koepel}
             <div class="accordion-content">
-              <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per koepel</span>
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    checked={visualMode === "koepel"}
-                    onchange={() => handleVisualToggle("koepel")}
-                  />
-                  <span class="slider"></span>
-                </label>
-              </div>
               <hr class="separator" />
               {#each uniqueKoepels as koepel}
                 <label class="filter-item">
@@ -1931,11 +1770,6 @@
                       (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
                   />
                   <span class="filter-text">{koepel}</span>
-                  <span
-                    class="color-swatch"
-                    style="background-color: {KOEPEL_COLORS[koepel] ||
-                      KOEPEL_COLORS.default}"
-                  ></span>
                 </label>
               {/each}
             </div>
@@ -2007,17 +1841,44 @@
     <div
       class="map-container"
       class:selecting-location={isSelectingLocation}
+      class:has-selected-marker={selectedPlace != null}
       bind:this={mapContainer}
     >
       {#if !isMobile && showQrBlock}{/if}
     </div>
 
+    <!-- Basemap Toggle (Top Right) -->
+    <div
+      class="basemap-toggle"
+      class:has-popup={selectedPlace != null}
+      role="group"
+      aria-label="Kies achtergrondkaart"
+    >
+      <button
+        type="button"
+        class="basemap-toggle-btn"
+        class:active={activeBasemap === "satellite"}
+        onclick={() => setBasemap("satellite")}
+        aria-pressed={activeBasemap === "satellite"}
+        title="PDOK Satellietbeeld"
+      >
+        <i class="ph ph-planet"></i>
+        <span>Satelliet</span>
+      </button>
+      <button
+        type="button"
+        class="basemap-toggle-btn"
+        class:active={activeBasemap === "protomaps"}
+        onclick={() => setBasemap("protomaps")}
+        aria-pressed={activeBasemap === "protomaps"}
+        title="Protomap (Wit)"
+      >
+        <i class="ph ph-map-trifold"></i>
+        <span>Protomap</span>
+      </button>
+    </div>
+
     {#if selectedPlace}
-      {@const pd = getInfoPanelPieData(
-        selectedPlace.domeinen,
-        selectedPlace.hoofddomein,
-      )}
-      {@const pid = `pie-${selectedPlace.fid ?? 0}`}
       <div
         class="fixed-air-popup"
         onclick={(e) => e.stopPropagation()}
@@ -2050,126 +1911,35 @@
           </div>
 
           <div class="popup-info-row domains-row">
-            <span class="label">Domeinen</span>
-            <div class="domains-circle-wrap">
-              <svg
-                viewBox="0 0 100 100"
-                class="popup-domein-circle"
-                overflow="visible"
-              >
-                <defs>
-                  {#each pd.slices as slice, i}
-                    <!-- Ring arc for text label on the border -->
-                    <path id="{pid}-ring-{i}" d={slice.ringArc} />
-                    <!-- Slice arc for text label inside the slice -->
-                    {#if pd.N > 1}
-                      <path id="{pid}-slice-{i}" d={slice.sliceArc} />
-                    {/if}
-                  {/each}
-                </defs>
-
-                <!-- ① Pizza slices (interactive) -->
-                {#each pd.slices as slice, i}
-                  {#if pd.N === 1}
-                    <circle
-                      cx={pd.cx}
-                      cy={pd.cy}
-                      r={pd.innerR}
-                      fill={slice.fill}
-                      class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain ===
-                        slice.domain}
-                      onmouseenter={() => (hoveredSliceDomain = slice.domain)}
-                      onmouseleave={() => (hoveredSliceDomain = null)}
-                    />
-                  {:else}
-                    <path
-                      d={slice.piePath}
-                      fill={slice.fill}
-                      class="pie-slice"
-                      class:highlighted-slice={hoveredSliceDomain ===
-                        slice.domain}
-                      onmouseenter={() => (hoveredSliceDomain = slice.domain)}
-                      onmouseleave={() => (hoveredSliceDomain = null)}
-                    />
-                  {/if}
-                {/each}
-
-                <!-- ② Divider lines between slices -->
-                {#if pd.N > 1}
-                  {#each pd.slices as _, i}
-                    {@const a = -Math.PI / 2 + i * ((2 * Math.PI) / pd.N)}
-                    <line
-                      x1={pd.cx}
-                      y1={pd.cy}
-                      x2={(pd.cx + pd.innerR * Math.cos(a)).toFixed(2)}
-                      y2={(pd.cy + pd.innerR * Math.sin(a)).toFixed(2)}
-                      stroke="rgba(255,255,255,0.5)"
-                      stroke-width="0.5"
-                    />
-                  {/each}
+            <span class="label">Domein-waarden</span>
+            {#if true}
+              {@const domeinList = [
+                ...new Set(
+                  (selectedPlace.domeinen || "")
+                    .split(";")
+                    .map((d) => d.trim()),
+                ),
+              ].filter(Boolean)}
+              {@const hoofd =
+                (selectedPlace.hoofddomein || "").trim() || domeinList[0] || ""}
+              {@const rest = domeinList.filter((d) => d !== hoofd)}
+              <div class="popup-tags domein-tags-row">
+                {#if hoofd}
+                  <span
+                    class="p-tag domein-tag domein-tag--main"
+                    style="background-color: {DOMEIN_COLORS[hoofd] ||
+                      DOMEIN_COLORS.default};">{hoofd}</span
+                  >
                 {/if}
-
-                <!-- ③ Outer ring (hoofddomein color) -->
-                <circle
-                  cx={pd.cx}
-                  cy={pd.cy}
-                  r={pd.ringTextR}
-                  fill="none"
-                  stroke={pd.hoofddomeinColor}
-                  stroke-width={pd.ringW}
-                  stroke-opacity="0.92"
-                />
-
-                <!-- ④ Text on the ring border, following the arc -->
-                {#each pd.slices as slice, i}
-                  {#if slice.domain !== "default"}
-                    <text
-                      font-size={pd.fzRing}
-                      font-weight="700"
-                      fill="white"
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      font-family="Inter, sans-serif"
-                      letter-spacing="0.2"
-                      style="text-transform: uppercase;"
-                      class:highlighted-ring-text={hoveredSliceDomain ===
-                        slice.domain}
-                      onmouseenter={() => (hoveredSliceDomain = slice.domain)}
-                      onmouseleave={() => (hoveredSliceDomain = null)}
-                    >
-                      <textPath href="#{pid}-ring-{i}" startOffset="50%">
-                        {slice.domain}
-                      </textPath>
-                    </text>
-                  {/if}
+                {#each rest as d}
+                  <span
+                    class="p-tag domein-tag"
+                    style="background-color: {DOMEIN_COLORS[d] ||
+                      DOMEIN_COLORS.default};">{d}</span
+                  >
                 {/each}
-
-                <!-- ⑤ Text inside each slice, following its arc -->
-                {#if pd.N > 1}
-                  {#each pd.slices as slice, i}
-                    {#if slice.domain !== "default"}
-                      <text
-                        font-size={pd.fzSlice}
-                        font-weight="600"
-                        fill="rgba(255,255,255,0.9)"
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        font-family="Inter, sans-serif"
-                        letter-spacing="0.15"
-                        style="text-transform: uppercase; pointer-events: none;"
-                        class:highlighted-ring-text={hoveredSliceDomain ===
-                          slice.domain}
-                      >
-                        <textPath href="#{pid}-slice-{i}" startOffset="50%">
-                          {slice.domain}
-                        </textPath>
-                      </text>
-                    {/if}
-                  {/each}
-                {/if}
-              </svg>
-            </div>
+              </div>
+            {/if}
           </div>
 
           <div class="popup-info-row koepel-row">
@@ -2307,7 +2077,7 @@
             aria-hidden="true"
           ></span>
           <div class="category-text">
-            <strong>Domeinen</strong>
+            <strong>Domein-waarden</strong>
             <p>
               De initiatieven zijn onderverdeeld in domeinen. Sommige
               initiatieven vallen onder meerdere domeinen.
@@ -2728,6 +2498,20 @@
       z-index: 2010 !important;
     }
 
+    .basemap-toggle {
+      top: 10px;
+      right: 10px;
+    }
+
+    .basemap-toggle.has-popup {
+      right: 10px;
+    }
+
+    .basemap-toggle-btn {
+      padding: 5px 9px;
+      font-size: 0.72rem;
+    }
+
     .sidebar.open {
       transform: translateY(0);
     }
@@ -3030,28 +2814,6 @@
     color: #ef4444;
   }
 
-  .choropleth-toggle-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    color: #9ca3af;
-    flex-shrink: 0;
-  }
-  .choropleth-toggle-btn:hover {
-    background-color: rgba(93, 105, 251, 0.08);
-    color: #4b5563;
-  }
-  .choropleth-toggle-btn.active {
-    background-color: rgba(93, 105, 251, 0.1);
-    color: #5d69fb;
-  }
-
   .filter-item {
     display: flex;
     align-items: center;
@@ -3288,6 +3050,65 @@
     border: 1px solid rgba(255, 255, 255, 0.25);
     box-sizing: border-box;
   }
+
+  /* BASEMAP TOGGLE (Top Right) */
+  .basemap-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1500;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    padding: 3px;
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.05);
+    gap: 3px;
+    transition:
+      right 0.3s cubic-bezier(0.1, 1, 0.1, 1),
+      top 0.3s ease;
+  }
+
+  .basemap-toggle.has-popup {
+    right: 330px;
+  }
+
+  .basemap-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    color: #555555;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .basemap-toggle-btn i {
+    font-size: 14px;
+  }
+
+  .basemap-toggle-btn:hover:not(.active) {
+    color: #111111;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .basemap-toggle-btn.active {
+    background: #5d69fb;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(93, 105, 251, 0.35);
+  }
   .popup-top-bar {
     display: flex;
     justify-content: space-between;
@@ -3372,15 +3193,28 @@
 
   .p-tag {
     font-size: 10px;
-    padding: 3px 6px;
-    margin-right: 4px;
-    margin-bottom: 4px;
+    padding: 2px 6px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     text-transform: uppercase;
     font-weight: bold;
     color: #ffffff;
     display: inline-block;
     border-radius: 5px;
+  }
+  /* Regular domein tags — compact, short */
+  .domein-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    line-height: 1.3;
+  }
+  /* Hoofddomein tag — larger, overrides .domein-tag */
+  .domein-tag--main {
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: bold;
+    letter-spacing: 0.03em;
   }
   .domain-name-tag {
     text-align: center;
@@ -3407,6 +3241,8 @@
   .popup-tags {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 4px;
     margin-top: 8px;
   }
   .popup-link {
@@ -3446,27 +3282,23 @@
     padding: 0;
     overflow: visible;
     box-sizing: border-box;
-    transform-origin: 50% 93%;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    transform-origin: 50% 97%;
+    transition: opacity 0.2s ease;
+    /* filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); */
     will-change: transform;
     backface-visibility: hidden;
-    /* Scale continuously from --marker-scale set every rAF during zoom */
-    transform: scale(var(--marker-scale, 1)) translateZ(0);
-    /* No transition on scale itself — it follows zoom in real-time */
+    /* Baseline transform — overridden by the dynamic CSSStyleSheet on zoom */
+    transform: scale(1) translateZ(0);
   }
 
   :global(.air-marker .outer-droplet) {
-    stroke: var(--outer-droplet-color, #ffffff);
-    stroke-width: 7;
-    stroke-linejoin: round;
+    stroke: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
   }
 
   :global(.air-marker .inner-circle) {
-  }
-
-  :global(.air-marker.thin-border .inner-circle) {
     stroke: #ffffff !important;
-    stroke-width: 1.5px !important;
+    stroke-width: 0px !important;
   }
 
   :global(.air-marker i) {
@@ -3475,20 +3307,19 @@
   }
 
   :global(.marker-container:hover .air-marker) {
-    transform: scale(calc(var(--marker-scale, 1) * 1.3)) translateZ(0);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
-    transition:
-      filter 0.15s ease-out,
-      transform 0.12s ease-out;
+    transition: filter 0.15s ease-out;
   }
 
   :global(.air-marker.active-glow) {
-    transform: scale(calc(var(--marker-scale, 1) * 1.3)) translateZ(0);
     filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
   }
 
-  :global(.air-marker.active-glow .inner-circle) {
-    stroke-width: 2px !important;
+  :global(.map-container.has-selected-marker .air-marker) {
+    opacity: 0.4;
+  }
+
+  :global(.map-container.has-selected-marker .air-marker.active-glow) {
+    opacity: 1;
   }
 
   :global(.air-area-marker) {
@@ -3497,10 +3328,34 @@
     height: 26px;
     border-radius: 0;
     transform-origin: 50% 50% !important;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    filter: none;
     will-change: transform;
     backface-visibility: hidden;
-    transform: scale(var(--marker-scale, 1)) translateZ(0);
+    /* Baseline transform — overridden by the dynamic CSSStyleSheet on zoom */
+    transform: scale(1) translateZ(0);
+  }
+
+  :global(.area-rings-group) {
+    opacity: 0;
+    transition: opacity 0.22s ease-out;
+    pointer-events: none;
+  }
+
+  :global(.marker-container:hover .air-area-marker),
+  :global(.air-area-marker:hover),
+  :global(.air-area-marker.active-glow) {
+    filter: none !important;
+  }
+
+  /* When hovering over the area location marker, the 3 circles appear */
+  :global(.marker-container:hover .air-area-marker .area-rings-group),
+  :global(.air-area-marker:hover .area-rings-group) {
+    opacity: 1;
+  }
+
+  /* When clicking, the circles remain */
+  :global(.air-area-marker.active-glow .area-rings-group) {
+    opacity: 1;
   }
 
   :global(.air-area-marker i) {

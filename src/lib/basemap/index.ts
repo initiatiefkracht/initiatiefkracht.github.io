@@ -5,14 +5,8 @@ import { StyleSpecification } from '@maplibre/maplibre-gl-style-spec'
 import { ALLMAPS_FLAVOR, TERRAIN_COLORS } from './colors.js'
 import { WHITE } from '@protomaps/basemaps'
 
-export function basemapStyle(
-  lang: string,
-  glyphs?: string,
-  sprite?: string,
-  tileJson?: string
-): StyleSpecification {
+export function getProtomapsWhiteLayers(lang = 'nl') {
   const layers = basemapLayers('protomaps', WHITE, { lang: lang })
-  // modify the buildings layer
   layers.forEach((layer) => {
     if (layer.id === 'buildings') {
       if (layer.paint && 'fill-outline-color' in layer.paint) {
@@ -24,12 +18,24 @@ export function basemapStyle(
       }
     }
   })
+  return layers
+}
+
+export function basemapStyle(
+  lang: string,
+  glyphs?: string,
+  sprite?: string,
+  tileJson?: string
+): StyleSpecification {
+  const layers = getProtomapsWhiteLayers(lang)
   return {
     version: 8,
     glyphs:
-      glyphs || 'https://fonts.allmaps.org/maplibre/{fontstack}/{range}.pbf',
+      glyphs ||
+      'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
     sprite:
-      sprite || 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+      sprite ||
+      'https://protomaps.github.io/basemaps-assets/sprites/v4/white',
     sources: {
       protomaps: {
         type: 'vector',
