@@ -186,8 +186,8 @@
             },
             paint: {
               "raster-saturation": -1,
-              "raster-contrast": 0.2,
-              "raster-brightness-min": 0.3,
+              "raster-contrast": 0.3,
+              "raster-brightness-min": 0.6,
               "raster-brightness-max": 1.0,
             },
           },
@@ -313,10 +313,6 @@
     updateMarkerScale();
   }
 
-  function handleVisualToggle(mode) {
-    visualMode = visualMode === mode ? "default" : mode;
-  }
-
   const POINT_ZOOM = 15.5;
   const AREA_ZOOM = 13;
   const LARGE_AREA_ZOOM = 11;
@@ -325,12 +321,16 @@
     Wonen: "#E63114",
     Welzijn: "#F5BD02",
     Cultuur: "#FF6D1D",
-    Klimaat: "#AECCE6",
+    Klimaat: "#C0E2FF",
     Voedsel: "#377E42",
     Groen: "#C0DA81",
     Circulair: "#D2B2F5",
-    Mobiliteit: "#00ACC1",
+    Mobiliteit: "#0990CF",
     Energie: "#FE7EAE",
+    Vrijplaats: "#AEEFFF",
+    Werk: "#4D2AFF",
+    Educatie: "#FFEE51",
+    Sociaal: "#43BB9F",
     default: "#5d69fb",
   };
 
@@ -396,6 +396,7 @@
     "Welzijnscoalitie Delfshaven": "#D8B4FE",
     Thuismakerscollectief: "#F9A8D4",
     RoCoCo: "#A5B4FC",
+    "Warm Rotterdam": "#000000",
     default: "#5d69fb",
   };
 
@@ -580,17 +581,21 @@
   );
   let uniqueDomeinen = $derived(
     [
-      ...new Set(
-        allPlaces.flatMap((p) => [
+      ...new Set([
+        ...Object.keys(DOMEIN_COLORS).filter((d) => d !== "default"),
+        ...allPlaces.flatMap((p) => [
           ...new Set(p.domeinen?.split(";").map((d) => d.trim())),
         ]),
-      ),
+      ]),
     ]
       .filter(Boolean)
       .sort((a, b) => {
         const domeinOrder = Object.keys(DOMEIN_COLORS);
         const aIndex = domeinOrder.indexOf(a);
         const bIndex = domeinOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
         return aIndex - bIndex;
       }),
   );
@@ -1050,89 +1055,47 @@
   }
 
   function getPieChartSvg(colors, isArea = false, outerColor = "#ffffff") {
-    if (isArea) {
-      const cx = 50;
-      const cy = 50;
-      const outerR = 41;
-      const innerR = 32;
-      const clipId = "area-clip-" + Math.random().toString(36).substring(2, 9);
+    const cx = 45;
+    const cy = 45;
+    const outerR = 36;
+    const innerR = 27;
+    const extraR = 51; // 50 (same width as outside border: 9px)
+    const clipId =
+      (isArea ? "area-clip-" : "point-clip-") +
+      Math.random().toString(36).substring(2, 9);
 
-      const rings = `
+    const rings = isArea
+      ? `
         <g class="area-rings-group">
           <circle cx="${cx}" cy="${cy}" r="60" fill="${outerColor}" stroke="none" stroke-width="8.0" fill-opacity="0.6" class="area-ring area-ring-1" />
           <circle cx="${cx}" cy="${cy}" r="90" fill="${outerColor}" stroke="none" stroke-width="5.0" fill-opacity="0.5" class="area-ring area-ring-2" />
           <circle cx="${cx}" cy="${cy}" r="140" fill="${outerColor}" stroke="none" stroke-width="2.0" fill-opacity="0.4" class="area-ring area-ring-3" />
         </g>
-      `;
-      const outerCircle = `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle" />`;
+      `
+      : "";
 
-      if (colors.length === 0) {
-        return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-          ${rings}
-          ${outerCircle}
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
-        </svg>`;
-      }
-      if (colors.length === 1) {
-        return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-          ${rings}
-          ${outerCircle}
-          <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
-        </svg>`;
-      }
+    const extraRing = isArea
+      ? `<circle cx="${cx}" cy="${cy}" r="${extraR}" fill="${outerColor}" fill-opacity="0.45" class="area-extra-ring" />`
+      : "";
 
-      let paths = [];
-      const totalSlices = colors.length;
-
-      let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
-      const anglePerSlice = (2 * Math.PI) / totalSlices;
-
-      for (let i = 0; i < totalSlices; i++) {
-        const startAngle = accumulatedAngle;
-        const endAngle = accumulatedAngle + anglePerSlice;
-        accumulatedAngle = endAngle;
-
-        const x1 = cx + innerR * Math.cos(startAngle);
-        const y1 = cy + innerR * Math.sin(startAngle);
-        const x2 = cx + innerR * Math.cos(endAngle);
-        const y2 = cy + innerR * Math.sin(endAngle);
-
-        const largeArcFlag = 0;
-        const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR} ${innerR} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-        paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
-      }
-
-      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <defs>
-          <clipPath id="${clipId}">
-            <circle cx="${cx}" cy="${cy}" r="${innerR}" />
-          </clipPath>
-        </defs>
-        ${rings}
-        ${outerCircle}
-        <g clip-path="url(#${clipId})">
-          ${paths.join("")}
-        </g>
-        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
-      </svg>`;
-    }
-
-    const dropletPath =
-      "M 50 97 C 36 83, 11 60, 11 37 A 39 39 0 1 1 89 37 C 89 60, 64 83, 50 97 Z";
-    const r = 31; // Radius of the inner circle
-    const cx = 50; // Center of the circular part
-    const cy = 37; // Center of the circular part
+    const outerCircle = isArea
+      ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle area-outer-circle" />`
+      : `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" stroke="#ffffff" stroke-width="0" class="outer-border-circle point-outer-circle" />`;
 
     if (colors.length === 0) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+        ${rings}
+        ${extraRing}
+        ${outerCircle}
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
     if (colors.length === 1) {
       return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
-        <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+        ${rings}
+        ${extraRing}
+        ${outerCircle}
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
       </svg>`;
     }
 
@@ -1147,29 +1110,29 @@
       const endAngle = accumulatedAngle + anglePerSlice;
       accumulatedAngle = endAngle;
 
-      const x1 = cx + r * Math.cos(startAngle);
-      const y1 = cy + r * Math.sin(startAngle);
-      const x2 = cx + r * Math.cos(endAngle);
-      const y2 = cy + r * Math.sin(endAngle);
+      const x1 = cx + innerR * Math.cos(startAngle);
+      const y1 = cy + innerR * Math.sin(startAngle);
+      const x2 = cx + innerR * Math.cos(endAngle);
+      const y2 = cy + innerR * Math.sin(endAngle);
 
       const largeArcFlag = 0;
-      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR} ${innerR} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
       paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
     }
-
-    const clipId = "droplet-clip-" + Math.random().toString(36).substring(2, 9);
 
     return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
       <defs>
         <clipPath id="${clipId}">
-          <circle cx="${cx}" cy="${cy}" r="${r}" />
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" />
         </clipPath>
       </defs>
-      <path class="outer-droplet" d="${dropletPath}" fill="${outerColor}" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
+      ${rings}
+      ${extraRing}
+      ${outerCircle}
       <g clip-path="url(#${clipId})">
         ${paths.join("")}
       </g>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+      <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
     </svg>`;
   }
 
@@ -1331,13 +1294,6 @@
   $effect(() => {
     if (!map) return;
 
-    if (activeHeatmapDomain) {
-      markers.forEach((m) => m.remove());
-      markers = [];
-      markerMap.clear();
-      return;
-    }
-
     const reversedPlaces = [...filteredPlaces].reverse();
 
     reversedPlaces.forEach((place) => {
@@ -1349,6 +1305,7 @@
 
       el.className = "air-marker";
       if (isArea) el.classList.add("air-area-marker");
+      else el.classList.add("air-point-marker");
       if (visualMode === "domein") el.classList.add("thin-border");
       const domeinList = [
         ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
@@ -1370,7 +1327,7 @@
         borderCol = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
       }
 
-      // Use hoofddomein color for droplet/outer border in default/domein modes
+      // Use hoofddomein color for outer border in default/domein modes
       const hoofddomeinColor =
         DOMEIN_COLORS[(place.hoofddomein || "").trim()] ||
         DOMEIN_COLORS[domeinList[0]] ||
@@ -1411,7 +1368,7 @@
 
       const m = new maplibregl.Marker({
         element: container,
-        anchor: isArea ? "center" : "bottom",
+        anchor: "center",
       })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
@@ -1432,148 +1389,6 @@
       markers.forEach((m) => m.remove());
       markers = [];
       markerMap.clear();
-    };
-  });
-
-  let wasHeatmapActive = false;
-  $effect(() => {
-    const isActive = activeHeatmapDomain !== null;
-    if (isActive && !wasHeatmapActive && map) {
-      map.flyTo({
-        center: [4.47, 51.915],
-        zoom: 11.5,
-        essential: true,
-      });
-    }
-    wasHeatmapActive = isActive;
-  });
-
-  $effect(() => {
-    if (!mapLoaded || !map) return;
-
-    if (!activeHeatmapDomain) {
-      if (map.getLayer("heatmap-layer")) {
-        map.removeLayer("heatmap-layer");
-      }
-      if (map.getSource("heatmap-source")) {
-        map.removeSource("heatmap-source");
-      }
-      return;
-    }
-
-    const features = allPlaces
-      .map((place) => {
-        const lon = parseFloat(place.longitude);
-        const lat = parseFloat(place.latitude);
-        if (isNaN(lon) || isNaN(lat)) return null;
-
-        const props = {};
-        const domeinen = (place.domeinen || "")
-          .split(";")
-          .map((d) => d.trim())
-          .filter(Boolean);
-        domeinen.forEach((d) => {
-          props[`is_${d}`] = true;
-        });
-        return {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [lon, lat],
-          },
-          properties: props,
-        };
-      })
-      .filter(Boolean);
-
-    const geoJson = {
-      type: "FeatureCollection",
-      features,
-    };
-
-    if (!map.getSource("heatmap-source")) {
-      map.addSource("heatmap-source", {
-        type: "geojson",
-        data: geoJson,
-      });
-    } else {
-      map.getSource("heatmap-source").setData(geoJson);
-    }
-
-    const beforeId = map.getLayer("buurten-fill") ? "buurten-fill" : undefined;
-
-    if (!map.getLayer("heatmap-layer")) {
-      map.addLayer(
-        {
-          id: "heatmap-layer",
-          type: "heatmap",
-          source: "heatmap-source",
-          filter: ["has", `is_${activeHeatmapDomain}`],
-          paint: {
-            "heatmap-weight": 1,
-            "heatmap-intensity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              0,
-              1,
-              15,
-              3,
-            ],
-            "heatmap-color": [
-              "interpolate",
-              ["linear"],
-              ["heatmap-density"],
-              0,
-              "rgba(0, 0, 255, 0)",
-              0.2,
-              "rgba(0, 0, 255, 0.2)",
-              0.4,
-              "rgba(0, 255, 255, 0.5)",
-              0.6,
-              "rgba(0, 255, 0, 0.6)",
-              0.8,
-              "rgba(255, 255, 0, 0.7)",
-              1.0,
-              "rgba(255, 0, 0, 0.8)",
-            ],
-            "heatmap-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              0,
-              2,
-              9,
-              15,
-              15,
-              35,
-            ],
-            "heatmap-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              13,
-              0.75,
-              15,
-              0.4,
-              17,
-              0,
-            ],
-          },
-        },
-        beforeId,
-      );
-    } else {
-      map.setFilter("heatmap-layer", ["has", `is_${activeHeatmapDomain}`]);
-    }
-
-    return () => {
-      if (map && map.getLayer("heatmap-layer")) {
-        map.removeLayer("heatmap-layer");
-      }
-      if (map && map.getSource("heatmap-source")) {
-        map.removeSource("heatmap-source");
-      }
     };
   });
 
@@ -1697,17 +1512,6 @@
           </button>
           {#if openSections.domein}
             <div class="accordion-content">
-              <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per domein-waarde</span>
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    checked={visualMode === "domein"}
-                    onchange={() => handleVisualToggle("domein")}
-                  />
-                  <span class="slider"></span>
-                </label>
-              </div>
               <hr class="separator" />
               {#each uniqueDomeinen as domein}
                 <div class="filter-item-row">
@@ -1722,28 +1526,13 @@
                         ))}
                     />
                     <span class="filter-text">{domein}</span>
-                    <i
-                      class="ph {DOMEIN_ICONS[domein] ||
-                        DOMEIN_ICONS.default} sidebar-icon"
-                      style="color: {DOMEIN_COLORS[domein] ||
-                        DOMEIN_COLORS.default}"
-                    ></i>
+                    <span
+                      class="domein-color-square"
+                      style="background-color: {DOMEIN_COLORS[domein] ||
+                        DOMEIN_COLORS.default};"
+                      aria-hidden="true"
+                    ></span>
                   </label>
-                  <button
-                    class="heatmap-toggle-btn"
-                    class:active={activeHeatmapDomain === domein}
-                    onclick={() => {
-                      if (activeHeatmapDomain === domein) {
-                        activeHeatmapDomain = null;
-                      } else {
-                        activeHeatmapDomain = domein;
-                      }
-                    }}
-                    title="Toon heatmap voor dit domein"
-                    type="button"
-                  >
-                    <i class="ph ph-fire"></i>
-                  </button>
                 </div>
               {/each}
             </div>
@@ -2031,7 +1820,7 @@
     <div class="info-column block-middle">
       <h2>LEGENDA</h2>
       <p>
-        Hieronder vind je een uitleg van de categorieën en domeinen die we
+        Hieronder vind je een uitleg van de categorieën en domein-waarden die we
         gebruiken om de initiatieven te ordenen.
       </p>
       <div class="category-list">
@@ -2072,15 +1861,17 @@
 
         <div class="category-item">
           <span
-            class="domein-icon ph ph-house"
-            style="color: {DOMEIN_COLORS['Wonen']}"
+            class="domein-color-square"
+            style="width: 18px; height: 18px; border-radius: 4px; background-color: {DOMEIN_COLORS[
+              'Wonen'
+            ]};"
             aria-hidden="true"
           ></span>
           <div class="category-text">
             <strong>Domein-waarden</strong>
             <p>
-              De initiatieven zijn onderverdeeld in domeinen. Sommige
-              initiatieven vallen onder meerdere domeinen.
+              De initiatieven zijn onderverdeeld in domein-waarden. Sommige
+              initiatieven vallen onder meerdere domein-waarden.
             </p>
           </div>
         </div>
@@ -2792,27 +2583,6 @@
     width: 100%;
     gap: 4px;
   }
-  .heatmap-toggle-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    color: #9ca3af;
-    flex-shrink: 0;
-  }
-  .heatmap-toggle-btn:hover {
-    background-color: rgba(93, 105, 251, 0.08);
-    color: #4b5563;
-  }
-  .heatmap-toggle-btn.active {
-    background-color: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-  }
 
   .filter-item {
     display: flex;
@@ -3282,7 +3052,7 @@
     padding: 0;
     overflow: visible;
     box-sizing: border-box;
-    transform-origin: 50% 97%;
+    transform-origin: 50% 50%;
     transition: opacity 0.2s ease;
     /* filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); */
     will-change: transform;
@@ -3291,11 +3061,16 @@
     transform: scale(1) translateZ(0);
   }
 
+  :global(.air-marker .point-outer-circle),
   :global(.air-marker .outer-droplet) {
     stroke: #ffffff;
-    stroke-width: 5px;
+    stroke-width: 0px;
     stroke-linejoin: round;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+
+  :global(.air-marker .area-outer-circle) {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
   }
 
   :global(.air-marker .inner-circle) {
@@ -3337,10 +3112,14 @@
     transform: scale(1) translateZ(0);
   }
 
+  :global(.area-rings-group),
+  :global(.area-extra-ring) {
+    pointer-events: none;
+  }
+
   :global(.area-rings-group) {
     opacity: 0;
     transition: opacity 0.22s ease-out;
-    pointer-events: none;
   }
 
   :global(.marker-container:hover .air-area-marker),
@@ -3399,6 +3178,17 @@
     text-align: center;
   }
 
+  .domein-color-square {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
   .location-filter .filter-item {
     justify-content: space-between;
   }
@@ -3422,14 +3212,20 @@
     flex: 0 0 auto;
   }
 
+  .legend-marker-point {
+    background: #5d69fb;
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
   .legend-marker-area {
     background: #5d69fb;
     box-shadow:
-      0 0 0 3px #5d69fb90,
-      0 0 15px 8px rgba(132, 80, 255, 0.1),
-      0 2px 6px rgba(0, 0, 0, 0.2);
+      0 0 0 3px rgba(93, 105, 251, 0.45),
+      0 0 10px 4px rgba(132, 80, 255, 0.1),
+      0 2px 5px rgba(0, 0, 0, 0.2);
     border: none;
-    opacity: 0.6;
+    opacity: 0.95;
     max-width: 18px;
     max-height: 18px;
   }
