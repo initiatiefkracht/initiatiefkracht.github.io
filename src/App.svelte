@@ -18,31 +18,6 @@
   let allGeoFeatures = $state([]);
 
   let selectedPlace = $state(null);
-  let hoveredPlace = $state(null);
-  let hoveredSliceDomain = $state(null);
-  let isSelectingLocation = $state(false);
-  let tempMarker = null;
-  let newInitiative = $state({
-    name: "",
-    latitude: "",
-    longitude: "",
-    gebiedList: [],
-    domeinen: [],
-    website: "",
-    koepels: "",
-    initiatief_type: "plek",
-    location_type: "point",
-  });
-  let formStatusMessage = $state("");
-  let formStatusType = $state("");
-
-  let allPossibleBuurten = $derived(
-    [
-      ...new Set(
-        allGeoFeatures.map((f) => f.properties.buurtnaam).filter(Boolean),
-      ),
-    ].sort(),
-  );
   let activeMarkerElement = $state(null);
   let activeMarkerContainer = $state(null);
   let enlargedImage = $state(null);
@@ -107,7 +82,6 @@
   }
 
   let isMobile = $state(false);
-  let showQrBlock = $state(true);
 
   function setBasemap(mode) {
     if (activeBasemap === mode) return;
@@ -158,42 +132,6 @@
       }),
       "bottom-right",
     );
-
-    map.on("click", (e) => {
-      if (isSelectingLocation) {
-        const { lng, lat } = e.lngLat;
-        newInitiative.latitude = lat.toFixed(6);
-        newInitiative.longitude = lng.toFixed(6);
-
-        // Auto-detect the neighborhood (gebied) from the clicked point
-        const features = map.queryRenderedFeatures(e.point, {
-          layers: ["buurten-fill"],
-        });
-        if (features.length > 0) {
-          const buurtnaam = features[0].properties.buurtnaam || "";
-          if (buurtnaam) {
-            newInitiative.gebiedList = [buurtnaam];
-          }
-        }
-
-        // Draw/move temporary marker
-        if (tempMarker) {
-          tempMarker.setLngLat([lng, lat]);
-        } else {
-          const el = document.createElement("div");
-          el.className = "temp-marker";
-          el.innerHTML =
-            '<div style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background-color: #6458f5; border: 2.5px solid #ffffff;">' +
-            '<i class="ph ph-plus" style="font-size: 12px; color: #ffffff; font-weight: 900;"></i>' +
-            "</div>";
-          tempMarker = new maplibregl.Marker({ element: el })
-            .setLngLat([lng, lat])
-            .addTo(map);
-        }
-
-        isSelectingLocation = false; // exit selection mode
-      }
-    });
 
     map.on("load", () => {
       // Record CARTO vector style layer IDs and default visibility
@@ -391,11 +329,9 @@
   };
 
   let openSections = $state({
-    info: false,
-    gebied: false,
     domein: false,
     koepel: false,
-    contribute: false,
+    location: false,
   });
 
   function toggleSection(name) {
@@ -425,9 +361,6 @@
   let selectedGebieden = $state([]);
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
-  let clickedAreaGebieden = $state([]);
-
-  let hoveredAreaGebieden = $state([]);
 
   let locationFilterMode = $state("all");
   let searchQuery = $state("");
@@ -537,15 +470,6 @@
       curve: 1.2,
       essential: true,
     });
-
-    if (place.location_type === "area") {
-      clickedAreaGebieden = (place.gebied || "")
-        .split(";")
-        .map((g) => g.trim())
-        .filter(Boolean);
-    } else {
-      clickedAreaGebieden = [];
-    }
   }
   let uniqueKoepels = $derived(
     [
@@ -801,8 +725,6 @@
     return parts.join("; ");
   }
 
-  let buurtToFeatureIds = new Map();
-
   $effect(() => {
     const handleResize = () => {
       isMobile = window.innerWidth < 900;
@@ -875,17 +797,6 @@
     geoData.features.forEach((f, i) => (f.id = i));
     allGeoFeatures = geoData.features;
 
-    buurtToFeatureIds = new Map();
-    geoData.features.forEach((feature) => {
-      const buurtnaam = feature.properties.buurtnaam;
-      if (buurtnaam) {
-        if (!buurtToFeatureIds.has(buurtnaam)) {
-          buurtToFeatureIds.set(buurtnaam, []);
-        }
-        buurtToFeatureIds.get(buurtnaam).push(feature.id);
-      }
-    });
-
     Papa.parse(csvString, {
       header: true,
       dynamicTyping: true,
@@ -921,13 +832,6 @@
           place.gebied = canonicalizeGebiedNames(place.gebied, buurtNameMap);
         });
 
-        const localAdded = JSON.parse(
-          localStorage.getItem("local_initiatives") || "[]",
-        );
-        if (localAdded.length > 0) {
-          allPlaces = [...allPlaces, ...localAdded];
-        }
-
         ensureUniqueCoordinates(allPlaces);
 
         initMap(geoData);
@@ -943,159 +847,8 @@
       activeMarkerContainer.style.zIndex = "";
     }
     selectedPlace = null;
-    hoveredSliceDomain = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
-    clickedAreaGebieden = [];
-  }
-
-  async function saveInitiative() {
-    if (!newInitiative.name.trim()) {
-      formStatusMessage = "Vul a.b.b. de naam in.";
-      formStatusType = "error";
-      return;
-    }
-    if (!newInitiative.latitude || !newInitiative.longitude) {
-      formStatusMessage = "Kies a.b.b. de locatie op de kaart.";
-      formStatusType = "error";
-      return;
-    }
-
-    const nextFid =
-      allPlaces.length > 0
-        ? Math.max(...allPlaces.map((p) => p.fid || 0)) + 1
-        : 1;
-
-    const data = {
-      fid: nextFid,
-      name: newInitiative.name,
-      latitude: parseFloat(newInitiative.latitude),
-      longitude: parseFloat(newInitiative.longitude),
-      gebied: newInitiative.gebiedList.join("; "),
-      domeinen: newInitiative.domeinen.join("; "),
-      website: newInitiative.website,
-      koepels: newInitiative.koepels,
-      initiatief_type: newInitiative.initiatief_type,
-      location_type: newInitiative.location_type,
-    };
-
-    try {
-      const response = await fetch("/api/add-initiative", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        formStatusMessage = "Initiatief succesvol toegevoegd aan de kaart!";
-        formStatusType = "success";
-
-        // Add to local state dynamically
-        allPlaces.push(data);
-
-        // Clear form
-        resetForm();
-      } else {
-        throw new Error(result.error || "Onbekende fout");
-      }
-    } catch (e) {
-      console.warn(
-        "Could not save to CSV backend. Falling back to local storage.",
-        e,
-      );
-      // Fallback: save to state and localStorage (for static production builds)
-      allPlaces.push(data);
-
-      const localAdded = JSON.parse(
-        localStorage.getItem("local_initiatives") || "[]",
-      );
-      localAdded.push(data);
-      localStorage.setItem("local_initiatives", JSON.stringify(localAdded));
-
-      formStatusMessage =
-        "Initiatief toegevoegd aan de kaart in-memory (lokaal opgeslagen).";
-      formStatusType = "success";
-
-      resetForm();
-    }
-  }
-
-  function resetForm() {
-    newInitiative = {
-      name: "",
-      latitude: "",
-      longitude: "",
-      gebiedList: [],
-      domeinen: [],
-      website: "",
-      koepels: "",
-      initiatief_type: "plek",
-      location_type: "point",
-    };
-    if (tempMarker) {
-      tempMarker.remove();
-      tempMarker = null;
-    }
-  }
-
-  function downloadCSV() {
-    const headers = [
-      "fid",
-      "name",
-      "latitude",
-      "longitude",
-      "gebied",
-      "hoofddomein",
-      "domeinen",
-      "website",
-      "koepels",
-      "initiatief_type",
-      "location_type",
-    ];
-
-    const escapeCSV = (val) => {
-      if (val === null || val === undefined) return "";
-      let str = String(val);
-      if (
-        str.includes(";") ||
-        str.includes('"') ||
-        str.includes("\n") ||
-        str.includes("\r")
-      ) {
-        str = '"' + str.replace(/"/g, '""') + '"';
-      }
-      return str;
-    };
-
-    const rows = allPlaces.map((p) =>
-      [
-        p.fid,
-        escapeCSV(p.name),
-        p.latitude,
-        p.longitude,
-        escapeCSV(p.gebied),
-        escapeCSV(p.hoofddomein || ""),
-        escapeCSV(p.domeinen),
-        escapeCSV(p.website),
-        escapeCSV(p.koepels),
-        escapeCSV(p.initiatief_type),
-        escapeCSV(p.location_type),
-      ].join(";"),
-    );
-
-    const csvContent = [headers.join(";"), ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "initiatieven.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }
 
   function getPieChartSvg(colors, isArea = false, outerColor = "#ffffff") {
@@ -1180,161 +933,6 @@
     </svg>`;
   }
 
-  function getPieSlices(domains) {
-    const totalSlices = domains.length;
-    if (totalSlices === 0) {
-      return [
-        {
-          d: "",
-          fill: DOMEIN_COLORS.default,
-          domain: "default",
-        },
-      ];
-    }
-    if (totalSlices === 1) {
-      return [
-        {
-          d: "",
-          fill: DOMEIN_COLORS[domains[0]] || DOMEIN_COLORS.default,
-          domain: domains[0],
-        },
-      ];
-    }
-
-    const r = 50;
-    const cx = 50;
-    const cy = 50;
-    let slices = [];
-    let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
-    const anglePerSlice = (2 * Math.PI) / totalSlices;
-
-    for (let i = 0; i < totalSlices; i++) {
-      const startAngle = accumulatedAngle;
-      const endAngle = accumulatedAngle + anglePerSlice;
-      accumulatedAngle = endAngle;
-
-      const x1 = cx + r * Math.cos(startAngle);
-      const y1 = cy + r * Math.sin(startAngle);
-      const x2 = cx + r * Math.cos(endAngle);
-      const y2 = cy + r * Math.sin(endAngle);
-
-      const largeArcFlag = 0;
-      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-      slices.push({
-        d: pathData,
-        fill: DOMEIN_COLORS[domains[i]] || DOMEIN_COLORS.default,
-        domain: domains[i],
-      });
-    }
-    return slices;
-  }
-
-  /**
-   * Computes all geometry needed for the info-panel circle visualization:
-   * - Outer ring: solid hoofddomein color, single centered label
-   * - Inner pie slices: one per domein, each with its color and label
-   */
-  function getInfoPanelPieData(domeinen, hoofddomein) {
-    const domeinList = [
-      ...new Set((domeinen || "").split(";").map((d) => d.trim())),
-    ].filter(Boolean);
-    const N = domeinList.length;
-
-    const cx = 50,
-      cy = 50;
-    const outerR = 47; // outer edge of ring
-    const ringW = 12; // ring stroke width
-    const innerR = outerR - ringW; // inner edge of ring = pie outer radius
-    const ringTextR = outerR - ringW / 2; // midpoint of ring, for text arc
-    const sliceTextR = innerR * 0.58; // midpoint inside pie
-
-    // Resolve hoofddomein: explicit field first, else first domein, else default
-    const hoofddomeinName = (hoofddomein || "").trim() || domeinList[0] || "";
-    const hoofddomeinColor =
-      DOMEIN_COLORS[hoofddomeinName] || DOMEIN_COLORS.default;
-
-    // Font sizes based on number of domains
-    const fzRing = 5.0; // fixed — ring always shows only one word
-    const fzSlice = N <= 2 ? 4.5 : N <= 4 ? 3.8 : 3.0;
-
-    // Arc path helper (no fill, used as <textPath> reference)
-    const arcD = (r, a1, a2, sweep) => {
-      const x1 = cx + r * Math.cos(a1);
-      const y1 = cy + r * Math.sin(a1);
-      const x2 = cx + r * Math.cos(a2);
-      const y2 = cy + r * Math.sin(a2);
-      const large = Math.abs(a2 - a1) > Math.PI ? 1 : 0;
-      return `M${x1.toFixed(3)},${y1.toFixed(3)} A${r},${r} 0 ${large} ${sweep} ${x2.toFixed(3)},${y2.toFixed(3)}`;
-    };
-
-    // Top-half semicircle arc (9 o'clock → 3 o'clock, clockwise).
-    // A full-circle path has identical start/end points and SVG won't render
-    // text on it. A semicircle is a proper open path; startOffset="50%"
-    // centres the text at the 12 o'clock position of the ring.
-    const ringArc = arcD(ringTextR, Math.PI, 0, 1);
-
-    const anglePerSlice = (2 * Math.PI) / Math.max(N, 1);
-
-    const slices = domeinList.map((domain, i) => {
-      const startAngle = -Math.PI / 2 + i * anglePerSlice;
-      const endAngle = startAngle + anglePerSlice;
-      const midAngle = (startAngle + endAngle) / 2;
-
-      // Pie slice path
-      let piePath;
-      if (N === 1) {
-        piePath = `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`;
-      } else {
-        const x1 = (cx + innerR * Math.cos(startAngle)).toFixed(3);
-        const y1 = (cy + innerR * Math.sin(startAngle)).toFixed(3);
-        const x2 = (cx + innerR * Math.cos(endAngle)).toFixed(3);
-        const y2 = (cy + innerR * Math.sin(endAngle)).toFixed(3);
-        const laf = anglePerSlice > Math.PI ? 1 : 0;
-        piePath = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR},${innerR} 0 ${laf} 1 ${x2} ${y2} Z`;
-      }
-
-      // Slice text arc — clockwise top-half, counter-clockwise bottom-half
-      const isTopHalf = Math.sin(midAngle) <= 0;
-      const sliceArc = isTopHalf
-        ? arcD(sliceTextR, startAngle, endAngle, 1)
-        : arcD(sliceTextR, endAngle, startAngle, 0);
-
-      return {
-        piePath,
-        fill: DOMEIN_COLORS[domain] || DOMEIN_COLORS.default,
-        domain,
-        sliceArc,
-      };
-    });
-
-    // Fallback when no domeinen at all
-    if (N === 0) {
-      slices.push({
-        piePath: `M ${cx},${cy - innerR} A ${innerR},${innerR} 0 1 1 ${cx - 0.001},${cy - innerR} Z`,
-        fill: DOMEIN_COLORS.default,
-        domain: "",
-        sliceArc: "",
-      });
-    }
-
-    return {
-      slices,
-      hoofddomeinName,
-      hoofddomeinColor,
-      ringArc,
-      cx,
-      cy,
-      outerR,
-      innerR,
-      ringW,
-      ringTextR,
-      sliceTextR,
-      fzRing,
-      fzSlice,
-      N: Math.max(N, 1),
-    };
-  }
-
   $effect(() => {
     if (!map) return;
 
@@ -1389,21 +987,6 @@
       el.style.borderColor = borderCol;
       el.style.setProperty("--marker-border-color", borderCol);
       el.style.setProperty("--outer-droplet-color", outerColor);
-
-      if (isArea) {
-        const areaGebieden = (place.gebied || "")
-          .split(";")
-          .map((g) => g.trim());
-        el.addEventListener("mouseenter", () => {
-          hoveredPlace = place;
-          hoveredAreaGebieden = areaGebieden.filter(Boolean);
-        });
-
-        el.addEventListener("mouseleave", () => {
-          hoveredPlace = null;
-          hoveredAreaGebieden = [];
-        });
-      }
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1673,12 +1256,9 @@
     <!-- Map Container -->
     <div
       class="map-container"
-      class:selecting-location={isSelectingLocation}
       class:has-selected-marker={selectedPlace != null}
       bind:this={mapContainer}
-    >
-      {#if !isMobile && showQrBlock}{/if}
-    </div>
+    ></div>
 
     <!-- Basemap Toggle (Top Right) -->
     <div
@@ -2127,30 +1707,7 @@
     background: rgba(0, 0, 0, 0.2);
   }
 
-  .mobile-header {
-    display: none;
-  }
-
   @media (max-width: 900px) {
-    .mobile-header {
-      display: flex;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 60px;
-      background: #ffffff;
-      color: #5d69fb;
-      font-family: inherit;
-      font-weight: 900;
-      font-size: 1.4rem;
-      align-items: center;
-      justify-content: center;
-      z-index: 2500;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
     .fixed-air-popup {
       top: 15px !important;
       bottom: auto !important;
@@ -2229,10 +1786,6 @@
       padding-top: 4px;
     }
 
-    .brand,
-    .sidebar-collapse {
-      display: none !important;
-    }
     .accordion-content {
       max-height: none;
       overflow: visible;
@@ -2292,13 +1845,6 @@
       margin-bottom: 4px !important;
     }
 
-    .popup-footer {
-      width: 100%;
-      margin-top: 4px !important;
-      padding-top: 0 !important;
-      border-top: none !important;
-    }
-
     .popup-link {
       font-size: 10px !important;
       padding-bottom: 4px !important;
@@ -2332,20 +1878,6 @@
     display: none;
   }
 
-  .brand {
-    padding: 24px 20px;
-    font-weight: 900;
-    font-size: 1.4rem;
-    letter-spacing: -0.5px;
-    color: #5d69fb;
-    background-color: #ffffff;
-    text-align: center;
-  }
-  .location-filter {
-    padding: 16px 20px;
-    border-bottom: 1px solid #e0ddd5;
-    background: #ffffff;
-  }
   .search-group {
     margin-bottom: 12px;
     position: relative;
@@ -2440,12 +1972,6 @@
     padding: 0 20px 20px 20px;
     text-align: left;
   }
-  .accordion-content p {
-    font-size: 0.8rem;
-    color: #666;
-    line-height: 1.4;
-    margin: 0;
-  }
 
   .accordion-divider {
     height: 1px;
@@ -2500,98 +2026,6 @@
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
   }
-  .qr-block {
-    padding: 16px 20px;
-    background: transparent;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    text-align: left;
-  }
-  .qr-info {
-    padding: 16px 20px;
-    background: transparent;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    letter-spacing: 0.3px;
-    color: #5d69fb;
-  }
-  .qr-info p {
-    margin: 0;
-    text-align: left;
-  }
-  .floating-qr-block {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    padding: 24px;
-    width: fit-content;
-    max-width: 70%;
-    z-index: 999;
-  }
-  .qr-close-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    font-size: 20px;
-    transition: color 0.2s ease;
-  }
-  .qr-close-btn:hover {
-    color: #5d69fb;
-  }
-  .qr-content {
-    display: grid;
-    grid-template-columns: auto auto auto;
-    align-items: center;
-    gap: 24px;
-  }
-
-  .qr-info-text {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    letter-spacing: 0.3px;
-    color: #666;
-    margin: 0;
-    text-align: left;
-    max-width: 320px;
-  }
-
-  .qr-code-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .qr-code-wrap img {
-    max-width: 120px;
-    width: 120px;
-    display: block;
-  }
-
-  .qr-scan-text {
-    font-size: 0.85rem;
-    margin: 0;
-    color: #000;
-    font-weight: 500;
-    line-height: 1.6;
-    text-align: left;
-    width: 110px;
-    flex-shrink: 0;
-  }
-
-  /* legacy selectors kept for compatibility with other layout variants */
 
   .stats strong {
     color: #5d69fb;
@@ -2601,67 +2035,10 @@
     accent-color: #5d69fb;
     cursor: pointer;
   }
-  .visual-toggle-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-  }
-  .toggle-text {
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #666;
-  }
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 34px;
-    height: 20px;
-  }
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #e0ddd5;
-    transition: 0.4s;
-    border-radius: 20px;
-  }
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
-  }
-  input:checked + .slider {
-    background-color: #5d69fb;
-  }
-  input:checked + .slider:before {
-    transform: translateX(14px);
-  }
   .separator {
     border: 0;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin: 12px 0;
-  }
-  .color-swatch {
-    width: 12px;
-    height: 12px;
-    display: inline-block;
-    border-radius: 3px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
   }
   .map-container {
     width: 100%;
@@ -2671,10 +2048,6 @@
     left: 0;
     z-index: 1;
     box-sizing: border-box;
-  }
-
-  .map-container.selecting-location :global(.maplibregl-canvas) {
-    cursor: crosshair !important;
   }
 
   .fixed-air-popup {
@@ -2817,16 +2190,6 @@
     display: block;
     margin-bottom: 4px;
   }
-  .popup-value {
-    font-size: 0.85rem;
-    color: #333;
-    font-weight: 500;
-  }
-  .popup-footer {
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid #eee;
-  }
 
   @keyframes popup-slide-in {
     from {
@@ -2863,15 +2226,6 @@
     border-radius: 6px;
     font-weight: bold;
     letter-spacing: 0.03em;
-  }
-  .domain-name-tag {
-    text-align: center;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    width: fit-content;
-    height: fit-content;
   }
   a.p-tag {
     cursor: pointer;
@@ -3056,10 +2410,6 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
 
-  .location-filter .filter-item {
-    justify-content: space-between;
-  }
-
   .legend-text {
     flex: 1;
     text-align: left;
@@ -3099,17 +2449,6 @@
     background: #fbbf72;
     border-radius: 4px;
     border: 1px solid rgba(0, 0, 0, 0.1);
-  }
-
-  .waardebloem-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: none;
-    text-align: center;
   }
 
   .waardebloem-icon-btn {
@@ -3243,20 +2582,6 @@
     font-size: 1.5rem;
   }
 
-  .initiatives-intro {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .initiatives-intro .lead {
-    font-size: 0.85rem;
-    color: #333;
-    line-height: 1.4;
-    margin: 0;
-  }
-
   .intro-section {
     margin-bottom: 8px;
     text-align: left;
@@ -3302,18 +2627,6 @@
     font-size: 0.8rem !important;
   }
 
-  .initiatives-intro .cta {
-    font-size: 0.8rem;
-    color: #666;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    padding-top: 12px;
-    margin-top: 4px;
-    line-height: 1.4;
-  }
-
-  .initiatives-intro .cta strong {
-    color: #5d69fb;
-  }
 
   .bottom-info-section {
     display: grid;
@@ -3353,9 +2666,6 @@
     color: #444444;
   }
 
-  .partners-logos {
-    padding-top: 15px;
-  }
 
   .block-contribute p {
     margin: 0;
@@ -3368,266 +2678,6 @@
     color: #5d69fb;
     text-decoration: underline;
     font-weight: 600;
-  }
-
-  .block-add-initiative-full {
-    grid-column: span 2;
-    margin-top: 20px;
-    padding-top: 25px;
-    border-top: 1px solid #e5e5e5;
-  }
-
-  .add-initiative-form {
-    margin-top: 30px;
-    padding-top: 30px;
-    border-top: 1px solid #e5e5e5;
-    font-family: "Inter", sans-serif;
-  }
-
-  .add-initiative-form h3 {
-    margin: 0 0 20px 0;
-    font-size: 1.3rem;
-    color: #333333;
-    font-weight: 700;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
-  }
-
-  .form-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 0;
-  }
-
-  .col-half {
-    flex: 1;
-  }
-
-  .form-group label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #555555;
-  }
-
-  .form-group input,
-  .form-group select {
-    padding: 10px 12px;
-    border: 1px solid #cccccc;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background-color: #ffffff;
-    color: #333333;
-    font-family: inherit;
-    box-sizing: border-box;
-    width: 100%;
-    transition:
-      border-color 0.2s,
-      box-shadow 0.2s;
-  }
-
-  .form-group input[readonly] {
-    background-color: #f5f5f5;
-    color: #777777;
-    cursor: not-allowed;
-  }
-
-  .form-group input:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: #5d69fb;
-    box-shadow: 0 0 0 3px rgba(93, 105, 251, 0.15);
-  }
-
-  .btn-select-location {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1.5px dashed #5d69fb;
-    background-color: rgba(93, 105, 251, 0.04);
-    color: #5d69fb;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-sizing: border-box;
-    width: 100%;
-    transition:
-      background-color 0.2s,
-      border-style 0.2s,
-      transform 0.1s;
-  }
-
-  .btn-select-location:hover {
-    background-color: rgba(93, 105, 251, 0.08);
-  }
-
-  .btn-select-location.active {
-    border-style: solid;
-    background-color: #5d69fb;
-    color: #ffffff;
-    animation: pulse-border 1.5s infinite alternate;
-  }
-
-  @keyframes pulse-border {
-    from {
-      box-shadow: 0 0 0 0px rgba(93, 105, 251, 0.4);
-    }
-    to {
-      box-shadow: 0 0 0 8px rgba(93, 105, 251, 0);
-    }
-  }
-
-  .domeinen-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 8px;
-    margin-top: 4px;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    position: relative;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .checkbox-label input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-  }
-
-  .domain-tag-indicator {
-    display: block;
-    padding: 6px 8px;
-    border: 1px solid transparent;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-align: center;
-    width: 100%;
-    box-sizing: border-box;
-    color: #444444;
-    transition: all 0.2s;
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 24px;
-  }
-
-  .btn-save,
-  .btn-download {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px 18px;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    font-weight: 700;
-    cursor: pointer;
-    border: none;
-    transition:
-      background-color 0.2s,
-      transform 0.1s;
-  }
-
-  .btn-save {
-    flex: 2;
-    background-color: #48b87c;
-    color: #ffffff;
-  }
-
-  .btn-save:hover {
-    background-color: #3ca36b;
-  }
-
-  .btn-save:active,
-  .btn-download:active {
-    transform: scale(0.98);
-  }
-
-  .btn-download {
-    flex: 1;
-    background-color: #f0f0f0;
-    color: #333333;
-    border: 1px solid #cccccc;
-  }
-
-  .btn-download:hover {
-    background-color: #e5e5e5;
-  }
-
-  .form-status-alert {
-    padding: 12px 16px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    font-size: 0.9rem;
-    line-height: 1.4;
-  }
-
-  .form-status-alert.error {
-    background-color: #fde8e8;
-    color: #9b1c1c;
-    border-left: 4px solid #f05252;
-  }
-
-  .form-status-alert.success {
-    background-color: #edfbf7;
-    color: #03543f;
-    border-left: 4px solid #0e9f6e;
-  }
-
-  .form-status-alert p {
-    margin: 0 !important;
-  }
-
-  :global(.temp-marker) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .buurten-checkbox-list {
-    max-height: 120px;
-    overflow-y: auto;
-    border: 1px solid #cccccc;
-    border-radius: 6px;
-    padding: 8px 12px;
-    background-color: #ffffff;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .buurt-checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.88rem;
-    color: #444444;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .buurt-checkbox-label input[type="checkbox"] {
-    width: auto !important;
-    margin: 0;
-    cursor: pointer;
   }
 
   /* Responsive styling to gracefully stack layout on tablets and mobile screens */
@@ -3761,12 +2811,6 @@
       width: 95%;
       gap: 24px;
       margin: 20px auto 40px auto;
-    }
-
-    .block-add-initiative-full {
-      grid-column: span 1 !important;
-      border-top: 1px solid #e5e5e5;
-      padding-top: 20px;
     }
 
     .block-waardebloem .waardebloem-content {
@@ -3984,67 +3028,5 @@
   .logos-section a:hover .org-logo {
     transform: scale(1.05);
     opacity: 0.85;
-  }
-
-  .domains-display {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 6px;
-  }
-
-  .domains-pie-wrapper {
-    width: 44px;
-    height: 44px;
-    border: 2.5px solid #ffffff;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-    background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    overflow: hidden;
-    box-sizing: border-box;
-    flex-shrink: 0;
-  }
-
-  .popup-pie-svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-  }
-
-  .pie-slice {
-    transition: filter 0.15s ease;
-    cursor: pointer;
-  }
-
-  .pie-slice:hover,
-  .pie-slice.highlighted-slice {
-    filter: brightness(1.15) saturate(1.15);
-  }
-
-  .domains-tags-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .interactive-tag {
-    cursor: pointer;
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease,
-      filter 0.2s ease;
-  }
-
-  .interactive-tag:hover,
-  .interactive-tag.highlighted-tag {
-    transform: scale(1.08);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    filter: brightness(1.05);
   }
 </style>
