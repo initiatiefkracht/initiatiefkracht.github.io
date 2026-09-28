@@ -812,11 +812,65 @@
     return () => window.removeEventListener("resize", handleResize);
   });
 
+  const GOOGLE_SHEETS_CSV_URL =
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vS74LFhv-sdPSljDvKum_MKtBo73jUw9QD-d8vIGbGYCEXOTRgSWGKVOUwYE_1veYwDXLfCUv3lScbi/pub?output=csv";
+
+  async function loadInitiatievenCSV() {
+    let csvString = "";
+
+    // 1. Try to retrieve fresh data directly from Google Sheets on initial page load
+    try {
+      const gSheetUrl = `${GOOGLE_SHEETS_CSV_URL}&_t=${Date.now()}`;
+      const response = await fetch(gSheetUrl, { cache: "no-store" });
+      if (response.ok) {
+        const text = await response.text();
+        if (text && text.includes("name") && text.includes("latitude")) {
+          csvString = text;
+
+          // Store in public folder via local dev server API if available
+          fetch("/api/save-csv", {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: csvString,
+          }).catch(() => {});
+
+          // Cache in sessionStorage so in-session navigation remains quick and smooth
+          try {
+            sessionStorage.setItem("initiatieven_csv", csvString);
+          } catch (_) {}
+
+          return csvString;
+        }
+      }
+    } catch (err) {
+      console.warn(
+        "Could not retrieve fresh data from Google Sheets, checking cache/local fallback:",
+        err,
+      );
+    }
+
+    // 2. Check cached version in sessionStorage for instant navigation
+    try {
+      const cached = sessionStorage.getItem("initiatieven_csv");
+      if (cached) return cached;
+    } catch (_) {}
+
+    // 3. Fallback: load initiatieven.csv from public folder
+    try {
+      const localResponse = await fetch("initiatieven.csv");
+      csvString = await localResponse.text();
+    } catch (fallbackErr) {
+      console.error("Failed to load local fallback CSV:", fallbackErr);
+    }
+
+    return csvString;
+  }
+
   onMount(async () => {
-    const response = await fetch("initiatieven.csv");
-    const csvString = await response.text();
-    const geoResponse = await fetch("rotterdam-buurten.json");
-    const geoData = await geoResponse.json();
+    const [csvString, geoData] = await Promise.all([
+      loadInitiatievenCSV(),
+      fetch("rotterdam-buurten.json").then((r) => r.json()),
+    ]);
 
     geoData.features.forEach((f, i) => (f.id = i));
     allGeoFeatures = geoData.features;
@@ -994,6 +1048,7 @@
       "latitude",
       "longitude",
       "gebied",
+      "hoofddomein",
       "domeinen",
       "website",
       "koepels",
@@ -1022,6 +1077,7 @@
         p.latitude,
         p.longitude,
         escapeCSV(p.gebied),
+        escapeCSV(p.hoofddomein || ""),
         escapeCSV(p.domeinen),
         escapeCSV(p.website),
         escapeCSV(p.koepels),
