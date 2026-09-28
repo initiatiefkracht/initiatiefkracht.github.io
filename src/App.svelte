@@ -3,17 +3,19 @@
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
+  const CARTO_POSITRON_STYLE =
+    "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
   let mapContainer = $state();
   let map = $state();
   let mapLoaded = $state(false);
+  let activeBasemap = $state("carto");
+  let cartoLayers = [];
   let allPlaces = $state([]);
   let markers = [];
   let markerMap = new Map();
-  let visualMode = $state("domein");
+  let visualMode = $state("default");
   let allGeoFeatures = $state([]);
-  let currentOpacities = new Map();
-  let opacityAnimationFrame = null;
 
   let selectedPlace = $state(null);
   let activeMarkerElement = $state(null);
@@ -80,12 +82,40 @@
   }
 
   let isMobile = $state(false);
-  let showQrBlock = $state(true);
+
+  function setBasemap(mode) {
+    if (activeBasemap === mode) return;
+    activeBasemap = mode;
+    if (!map) return;
+
+    const isSat = mode === "satellite";
+    if (map.getLayer("pdok-luchtfoto-layer")) {
+      map.setLayoutProperty(
+        "pdok-luchtfoto-layer",
+        "visibility",
+        isSat ? "visible" : "none",
+      );
+    }
+    for (const { id, defaultVisibility } of cartoLayers) {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(
+          id,
+          "visibility",
+          isSat ? "none" : defaultVisibility,
+        );
+      }
+    }
+  }
 
   function initMap(geoData) {
     map = new maplibregl.Map({
       container: mapContainer,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      fadeDuration: 0,
+      maxTileCacheSize: 150,
+      renderWorldCopies: false,
+      trackResize: true,
+      pitchWithRotate: false,
+      style: CARTO_POSITRON_STYLE,
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -104,34 +134,112 @@
     );
 
     map.on("load", () => {
+      // Record CARTO vector style layer IDs and default visibility
+      cartoLayers = (map.getStyle().layers || []).map((l) => ({
+        id: l.id,
+        defaultVisibility: l.layout?.visibility || "visible",
+      }));
+
+      // Add PDOK satellite raster source
+      map.addSource("pdok-luchtfoto", {
+        type: "raster",
+        tiles: [
+          "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/OGC:1.0:GoogleMapsCompatible/{z}/{x}/{y}.jpeg",
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution:
+          '© <a href="https://www.pdok.nl/" target="_blank" rel="noopener">PDOK</a> / Luchtfoto',
+      });
+
+      // Add PDOK satellite layer
+      map.addLayer({
+        id: "pdok-luchtfoto-layer",
+        type: "raster",
+        source: "pdok-luchtfoto",
+        layout: {
+          visibility: activeBasemap === "satellite" ? "visible" : "none",
+        },
+        paint: {
+          "raster-saturation": -1,
+          "raster-contrast": 0.3,
+          "raster-brightness-min": 0.6,
+          "raster-brightness-max": 1.0,
+        },
+      });
+
+      if (activeBasemap === "satellite") {
+        for (const { id } of cartoLayers) {
+          if (map.getLayer(id)) {
+            map.setLayoutProperty(id, "visibility", "none");
+          }
+        }
+      }
+
       map.addSource("rotterdam-buurten", {
         type: "geojson",
         data: geoData,
       });
 
-      map.addLayer(
-        {
-          id: "buurten-fill",
-          type: "fill",
-          source: "rotterdam-buurten",
-          paint: {
-            "fill-color": "#5d69fb",
-            "fill-opacity": [
-              "coalesce",
-              ["feature-state", "highlightOpacity"],
-              0,
-            ],
-          },
+      map.addLayer({
+        id: "buurten-fill",
+        type: "fill",
+        source: "rotterdam-buurten",
+        paint: {
+          "fill-color": "#5d69fb",
+          "fill-opacity": 0,
         },
-        "watername_ocean",
-      );
+      });
 
       mapLoaded = true;
     });
-  }
 
-  function handleVisualToggle(mode) {
-    visualMode = visualMode === mode ? "default" : mode;
+    // Smooth continuous marker scaling via a single shared stylesheet rule.
+    // Updating one CSS rule is far cheaper than setting a custom property on the
+    // container (which triggers inherited-variable resolution for every marker).
+    const MIN_SCALE = 0.55; // at zoom ~9
+    const MAX_SCALE = 1.8; // at zoom ~16
+    const ZOOM_REF = 12.5; // scale = 1.0 at this zoom
+
+    // Create a dedicated adoptable stylesheet so we can update it with replaceSync
+    // (zero DOM mutations, no style cascade triggered on any element).
+    const markerSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, markerSheet];
+
+    const applyMarkerScale = (scale) => {
+      const s = scale.toFixed(4);
+      markerSheet.replaceSync(`
+        .air-marker {
+          transform: scale(${s}) translateZ(0);
+        }
+        .air-area-marker {
+          transform: scale(${s}) translateZ(0);
+        }
+        .marker-container:hover .air-marker {
+          transform: scale(calc(${s} * 1.3)) translateZ(0);
+        }
+        .air-marker.active-glow {
+          transform: scale(calc(${s} * 1.3)) translateZ(0);
+        }
+      `);
+    };
+
+    const updateMarkerScale = () => {
+      // Wrap map access in untrack() to prevent Svelte state tracking on zoom frames
+      const zoom = untrack(() => map?.getZoom());
+      if (zoom === undefined) return;
+
+      const scale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, Math.pow(1.15, zoom - ZOOM_REF)),
+      );
+      applyMarkerScale(scale);
+    };
+
+    // MapLibre fires "zoom" inside its own rAF loop — no need to add another rAF.
+    map.on("zoom", updateMarkerScale);
+    map.on("load", updateMarkerScale);
+    updateMarkerScale();
   }
 
   const POINT_ZOOM = 15.5;
@@ -139,29 +247,20 @@
   const LARGE_AREA_ZOOM = 11;
 
   const DOMEIN_COLORS = {
-    Wonen: "#ba2585",
-    Welzijn: "#804895",
-    Cultuur: "#3c529e",
-    Klimaat: "#86ccdf",
-    Voedsel: "#78bc84",
-    Groen: "#89c05c",
-    Circulair: "#efb000",
-    Mobiliteit: "#d16c11",
-    Energie: "#af232d",
+    Wonen: "#E63114",
+    Welzijn: "#F5BD02",
+    Cultuur: "#FF6D1D",
+    Vrijplaats: "#D2B2F5",
+    Werk: "#FE7EAE",
+    Educatie: "#FFEE51",
+    Sociaal: "#B50425",
+    Klimaat: "#43BB9F",
+    Voedsel: "#377E42",
+    Groen: "#C0DA81",
+    Circulair: "#AEEFFF",
+    Mobiliteit: "#0990CF",
+    Energie: "#4D2AFF",
     default: "#5d69fb",
-  };
-
-  const DOMEIN_ICONS = {
-    Wonen: "ph-house",
-    Welzijn: "ph-heartbeat",
-    Cultuur: "ph-paint-brush-broad",
-    Klimaat: "ph-cloud-sun",
-    Voedsel: "ph-fork-knife",
-    Groen: "ph-tree",
-    Circulair: "ph-recycle",
-    Mobiliteit: "ph-bicycle",
-    Energie: "ph-lightning",
-    default: "ph-map-pin",
   };
 
   const GEBIED_COLORS = {
@@ -213,6 +312,7 @@
     "Welzijnscoalitie Delfshaven": "#D8B4FE",
     Thuismakerscollectief: "#F9A8D4",
     RoCoCo: "#A5B4FC",
+    "Warm Rotterdam": "#000000",
     default: "#5d69fb",
   };
 
@@ -225,14 +325,13 @@
     "Welzijnscoalitie Delfshaven": "https://welzijnscoalitie.nl/",
     Thuismakerscollectief: "https://thuismakerscollectief.nl/",
     RoCoCo: "https://rococo.coop/",
+    "Warm Rotterdam": "https://www.warmrotterdam.nl/",
   };
 
   let openSections = $state({
-    info: false,
-    gebied: false,
     domein: false,
     koepel: false,
-    contribute: false,
+    location: false,
   });
 
   function toggleSection(name) {
@@ -262,9 +361,6 @@
   let selectedGebieden = $state([]);
   let selectedDomeinen = $state([]);
   let selectedKoepels = $state([]);
-  let clickedAreaGebieden = $state([]);
-
-  let hoveredAreaGebieden = $state([]);
 
   let locationFilterMode = $state("all");
   let searchQuery = $state("");
@@ -283,7 +379,7 @@
     selectedKoepels = [];
     selectedGebieden = [];
     locationFilterMode = "all";
-    visualMode = "domein";
+    visualMode = "default";
   }
 
   function handleSearchKeyDown(e) {
@@ -323,6 +419,7 @@
     }
 
     selectedPlace = place;
+    hoveredSliceDomain = null;
     if (isMobile) {
       mobileSidebarOpen = false;
     }
@@ -373,40 +470,44 @@
       curve: 1.2,
       essential: true,
     });
-
-    if (place.location_type === "area") {
-      clickedAreaGebieden = (place.gebied || "")
-        .split(";")
-        .map((g) => g.trim())
-        .filter(Boolean);
-    } else {
-      clickedAreaGebieden = [];
-    }
   }
   let uniqueKoepels = $derived(
     [
-      ...new Set(
-        allPlaces.flatMap((p) => [
+      ...new Set([
+        ...Object.keys(KOEPEL_COLORS).filter((k) => k !== "default"),
+        ...allPlaces.flatMap((p) => [
           ...new Set(p.koepels?.split(";").map((k) => k.trim())),
         ]),
-      ),
+      ]),
     ]
       .filter(Boolean)
-      .sort(),
+      .sort((a, b) => {
+        const koepelOrder = Object.keys(KOEPEL_COLORS);
+        const aIndex = koepelOrder.indexOf(a);
+        const bIndex = koepelOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      }),
   );
   let uniqueDomeinen = $derived(
     [
-      ...new Set(
-        allPlaces.flatMap((p) => [
+      ...new Set([
+        ...Object.keys(DOMEIN_COLORS).filter((d) => d !== "default"),
+        ...allPlaces.flatMap((p) => [
           ...new Set(p.domeinen?.split(";").map((d) => d.trim())),
         ]),
-      ),
+      ]),
     ]
       .filter(Boolean)
       .sort((a, b) => {
         const domeinOrder = Object.keys(DOMEIN_COLORS);
         const aIndex = domeinOrder.indexOf(a);
         const bIndex = domeinOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
         return aIndex - bIndex;
       }),
   );
@@ -624,8 +725,6 @@
     return parts.join("; ");
   }
 
-  let buurtToFeatureIds = new Map();
-
   $effect(() => {
     const handleResize = () => {
       isMobile = window.innerWidth < 900;
@@ -635,25 +734,68 @@
     return () => window.removeEventListener("resize", handleResize);
   });
 
+  const GOOGLE_SHEETS_CSV_URL =
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vS74LFhv-sdPSljDvKum_MKtBo73jUw9QD-d8vIGbGYCEXOTRgSWGKVOUwYE_1veYwDXLfCUv3lScbi/pub?output=csv";
+
+  async function loadInitiatievenCSV() {
+    let csvString = "";
+
+    // 1. Try to retrieve fresh data directly from Google Sheets on initial page load
+    try {
+      const gSheetUrl = `${GOOGLE_SHEETS_CSV_URL}&_t=${Date.now()}`;
+      const response = await fetch(gSheetUrl, { cache: "no-store" });
+      if (response.ok) {
+        const text = await response.text();
+        if (text && text.includes("name") && text.includes("latitude")) {
+          csvString = text;
+
+          // Store in public folder via local dev server API if available
+          fetch("/api/save-csv", {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: csvString,
+          }).catch(() => {});
+
+          // Cache in sessionStorage so in-session navigation remains quick and smooth
+          try {
+            sessionStorage.setItem("initiatieven_csv", csvString);
+          } catch (_) {}
+
+          return csvString;
+        }
+      }
+    } catch (err) {
+      console.warn(
+        "Could not retrieve fresh data from Google Sheets, checking cache/local fallback:",
+        err,
+      );
+    }
+
+    // 2. Check cached version in sessionStorage for instant navigation
+    try {
+      const cached = sessionStorage.getItem("initiatieven_csv");
+      if (cached) return cached;
+    } catch (_) {}
+
+    // 3. Fallback: load initiatieven.csv from public folder
+    try {
+      const localResponse = await fetch("initiatieven.csv");
+      csvString = await localResponse.text();
+    } catch (fallbackErr) {
+      console.error("Failed to load local fallback CSV:", fallbackErr);
+    }
+
+    return csvString;
+  }
+
   onMount(async () => {
-    const response = await fetch("initiatieven.csv");
-    const csvString = await response.text();
-    const geoResponse = await fetch("rotterdam-buurten.json");
-    const geoData = await geoResponse.json();
+    const [csvString, geoData] = await Promise.all([
+      loadInitiatievenCSV(),
+      fetch("rotterdam-buurten.json").then((r) => r.json()),
+    ]);
 
     geoData.features.forEach((f, i) => (f.id = i));
     allGeoFeatures = geoData.features;
-
-    buurtToFeatureIds = new Map();
-    geoData.features.forEach((feature) => {
-      const buurtnaam = feature.properties.buurtnaam;
-      if (buurtnaam) {
-        if (!buurtToFeatureIds.has(buurtnaam)) {
-          buurtToFeatureIds.set(buurtnaam, []);
-        }
-        buurtToFeatureIds.get(buurtnaam).push(feature.id);
-      }
-    });
 
     Papa.parse(csvString, {
       header: true,
@@ -707,99 +849,93 @@
     selectedPlace = null;
     activeMarkerElement = null;
     activeMarkerContainer = null;
-    clickedAreaGebieden = [];
   }
 
-  let highlightedFeatureIds = new Set();
-  $effect(() => {
-    if (!mapLoaded || !map) return;
+  function getPieChartSvg(colors, isArea = false, outerColor = "#ffffff") {
+    const cx = 45;
+    const cy = 45;
+    const outerR = 36;
+    const innerR = 27;
+    const extraR = 51; // 50 (same width as outside border: 9px)
+    const clipId =
+      (isArea ? "area-clip-" : "point-clip-") +
+      Math.random().toString(36).substring(2, 9);
 
-    const areas = filteredPlaces.filter((p) => p.location_type === "area");
-    const hoveredSet = new Set(hoveredAreaGebieden);
-    const clickedSet = new Set(clickedAreaGebieden);
+    const rings = isArea
+      ? `
+        <g class="area-rings-group">
+          <circle cx="${cx}" cy="${cy}" r="60" fill="${outerColor}" stroke="none" stroke-width="8.0" fill-opacity="0.6" class="area-ring area-ring-1" />
+          <circle cx="${cx}" cy="${cy}" r="90" fill="${outerColor}" stroke="none" stroke-width="5.0" fill-opacity="0.5" class="area-ring area-ring-2" />
+          <circle cx="${cx}" cy="${cy}" r="140" fill="${outerColor}" stroke="none" stroke-width="2.0" fill-opacity="0.4" class="area-ring area-ring-3" />
+        </g>
+      `
+      : "";
 
-    const nextHighlightedIds = new Set();
-    areas.forEach((p) => {
-      const gebieden = p.gebied.split(";").map((g) => g.trim());
-      gebieden.forEach((gebied) => {
-        if (hoveredSet.has(gebied) || clickedSet.has(gebied)) {
-          const ids = buurtToFeatureIds.get(gebied) || [];
-          ids.forEach((id) => nextHighlightedIds.add(id));
-        }
-      });
-    });
+    const extraRing = isArea
+      ? `<circle cx="${cx}" cy="${cy}" r="${extraR}" fill="${outerColor}" fill-opacity="0.45" class="area-extra-ring" />`
+      : "";
 
-    highlightedFeatureIds.forEach((id) => {
-      if (!nextHighlightedIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: false },
-        );
-      }
-    });
+    const outerCircle = isArea
+      ? `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" class="outer-border-circle area-outer-circle" />`
+      : `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${outerColor}" stroke="#ffffff" stroke-width="0" class="outer-border-circle point-outer-circle" />`;
 
-    nextHighlightedIds.forEach((id) => {
-      if (!highlightedFeatureIds.has(id)) {
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlight: true },
-        );
-      }
-    });
-
-    highlightedFeatureIds = nextHighlightedIds;
-
-    const targetOpacities = new Map();
-    const duration = 400;
-    const maxOpacity = 0.3;
-
-    nextHighlightedIds.forEach((id) => targetOpacities.set(id, maxOpacity));
-
-    currentOpacities.forEach((_, id) => {
-      if (!targetOpacities.has(id)) {
-        targetOpacities.set(id, 0);
-      }
-    });
-
-    if (opacityAnimationFrame) cancelAnimationFrame(opacityAnimationFrame);
-
-    const startTime = performance.now();
-    const startOpacities = new Map(currentOpacities);
-
-    function animateOpacity(time) {
-      const progress = Math.min((time - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 2);
-
-      let needsNextFrame = false;
-
-      targetOpacities.forEach((targetVal, id) => {
-        const startVal = startOpacities.get(id) || 0;
-        const currentVal = startVal + (targetVal - startVal) * ease;
-
-        currentOpacities.set(id, currentVal);
-
-        map.setFeatureState(
-          { source: "rotterdam-buurten", id },
-          { highlightOpacity: currentVal },
-        );
-
-        if (progress < 1) {
-          needsNextFrame = true;
-        } else if (targetVal === 0) {
-          currentOpacities.delete(id);
-        }
-      });
-
-      if (needsNextFrame) {
-        opacityAnimationFrame = requestAnimationFrame(animateOpacity);
-      }
+    if (colors.length === 0) {
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        ${rings}
+        ${extraRing}
+        ${outerCircle}
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#5d69fb" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+      </svg>`;
+    }
+    if (colors.length === 1) {
+      return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+        ${rings}
+        ${extraRing}
+        ${outerCircle}
+        <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${colors[0]}" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+      </svg>`;
     }
 
-    opacityAnimationFrame = requestAnimationFrame(animateOpacity);
-  });
+    let paths = [];
+    const totalSlices = colors.length;
+
+    let accumulatedAngle = -Math.PI / 2; // start at top (12 o'clock)
+    const anglePerSlice = (2 * Math.PI) / totalSlices;
+
+    for (let i = 0; i < totalSlices; i++) {
+      const startAngle = accumulatedAngle;
+      const endAngle = accumulatedAngle + anglePerSlice;
+      accumulatedAngle = endAngle;
+
+      const x1 = cx + innerR * Math.cos(startAngle);
+      const y1 = cy + innerR * Math.sin(startAngle);
+      const x2 = cx + innerR * Math.cos(endAngle);
+      const y2 = cy + innerR * Math.sin(endAngle);
+
+      const largeArcFlag = 0;
+      const pathData = `M ${cx} ${cy} L ${x1} ${y1} A ${innerR} ${innerR} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+      paths.push(`<path d="${pathData}" fill="${colors[i]}" />`);
+    }
+
+    return `<svg viewBox="0 0 100 100" width="100%" height="100%" style="display: block; overflow: visible;">
+      <defs>
+        <clipPath id="${clipId}">
+          <circle cx="${cx}" cy="${cy}" r="${innerR}" />
+        </clipPath>
+      </defs>
+      ${rings}
+      ${extraRing}
+      ${outerCircle}
+      <g clip-path="url(#${clipId})">
+        ${paths.join("")}
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#ffffff" stroke-width="2.5" class="inner-circle" />
+    </svg>`;
+  }
 
   $effect(() => {
     if (!map) return;
+
     const reversedPlaces = [...filteredPlaces].reverse();
 
     reversedPlaces.forEach((place) => {
@@ -811,72 +947,56 @@
 
       el.className = "air-marker";
       if (isArea) el.classList.add("air-area-marker");
+      else el.classList.add("air-point-marker");
+      if (visualMode === "domein") el.classList.add("thin-border");
       const domeinList = [
         ...new Set((place.domeinen || "").split(";").map((d) => d.trim())),
-      ];
+      ].filter(Boolean);
 
-      let iconsHtml = "";
-      domeinList.forEach((d) => {
-        const iconColor = isArea
-          ? "#ffffff"
-          : DOMEIN_COLORS[d] || DOMEIN_COLORS.default;
-        const iconClass = DOMEIN_ICONS[d] || DOMEIN_ICONS.default;
-        iconsHtml += `<i class="ph ${iconClass}" style="color: ${iconColor};"></i>`;
-      });
+      // Always show domein pie slices regardless of visual mode
+      let sliceColors =
+        domeinList.length === 0
+          ? [DOMEIN_COLORS.default]
+          : domeinList.map((d) => DOMEIN_COLORS[d] || DOMEIN_COLORS.default);
 
-      el.innerHTML = iconsHtml;
+      let borderCol = "#5d69fb";
+      if (visualMode === "gebied") {
+        const gebiedKey = place.gebied || "default";
+        borderCol = GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
+      } else if (visualMode === "koepel") {
+        const koepelKey =
+          (place.koepels || "").split(";").map((k) => k.trim())[0] || "default";
+        borderCol = KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
+      }
+
+      // Use hoofddomein color for outer border in default/domein modes
+      const hoofddomeinColor =
+        DOMEIN_COLORS[(place.hoofddomein || "").trim()] ||
+        DOMEIN_COLORS[domeinList[0]] ||
+        "#ffffff";
+
+      const outerColor =
+        visualMode === "koepel" || visualMode === "gebied"
+          ? borderCol
+          : hoofddomeinColor;
+
+      el.innerHTML = getPieChartSvg(sliceColors, isArea, outerColor);
       container.appendChild(el);
 
-      if (isArea) {
-        el.style.backgroundColor = "#5d69fb";
-        el.style.opacity = "0.55";
-        el.style.borderColor = "#5d69fb80";
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#5d69fb80";
-        }
-        const areaGebieden = (place.gebied || "")
-          .split(";")
-          .map((g) => g.trim());
-        el.addEventListener("mouseenter", () => {
-          hoveredAreaGebieden = areaGebieden.filter(Boolean);
-        });
-
-        el.addEventListener("mouseleave", () => {
-          hoveredAreaGebieden = [];
-        });
-      } else {
-        if (visualMode === "gebied") {
-          const gebiedKey = place.gebied || "default";
-          el.style.borderColor =
-            GEBIED_COLORS[gebiedKey] || GEBIED_COLORS.default;
-        } else if (visualMode === "koepel") {
-          const koepelKey =
-            (place.koepels || "").split(";").map((k) => k.trim())[0] ||
-            "default";
-          el.style.borderColor =
-            KOEPEL_COLORS[koepelKey] || KOEPEL_COLORS.default;
-        } else {
-          el.style.borderColor = "#737ac6";
-        }
-        el.style.backgroundColor = "#ffffff";
-      }
+      el.style.backgroundColor = "transparent";
+      el.style.borderColor = borderCol;
+      el.style.setProperty("--marker-border-color", borderCol);
+      el.style.setProperty("--outer-droplet-color", outerColor);
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         activatePlaceOnMap(place);
       });
 
-      const m = new maplibregl.Marker({ element: container })
+      const m = new maplibregl.Marker({
+        element: container,
+        anchor: "center",
+      })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
@@ -1014,30 +1134,33 @@
             class="accordion-header"
             onclick={() => toggleSection("domein")}
           >
-            <span>Domein</span>
+            <span>Domein-waarden</span>
             <span class="icon">{openSections.domein ? "−" : "+"}</span>
           </button>
           {#if openSections.domein}
             <div class="accordion-content">
+              <hr class="separator" />
               {#each uniqueDomeinen as domein}
-                <label class="filter-item">
-                  <input
-                    type="checkbox"
-                    checked={selectedDomeinen.includes(domein)}
-                    onchange={() =>
-                      (selectedDomeinen = toggleFilter(
-                        selectedDomeinen,
-                        domein,
-                      ))}
-                  />
-                  <span class="filter-text">{domein}</span>
-                  <i
-                    class="ph {DOMEIN_ICONS[domein] ||
-                      DOMEIN_ICONS.default} sidebar-icon"
-                    style="color: {DOMEIN_COLORS[domein] ||
-                      DOMEIN_COLORS.default}"
-                  ></i>
-                </label>
+                <div class="filter-item-row">
+                  <label class="filter-item" style="flex: 1; margin: 0;">
+                    <input
+                      type="checkbox"
+                      checked={selectedDomeinen.includes(domein)}
+                      onchange={() =>
+                        (selectedDomeinen = toggleFilter(
+                          selectedDomeinen,
+                          domein,
+                        ))}
+                    />
+                    <span class="filter-text">{domein}</span>
+                    <span
+                      class="domein-color-square"
+                      style="background-color: {DOMEIN_COLORS[domein] ||
+                        DOMEIN_COLORS.default};"
+                      aria-hidden="true"
+                    ></span>
+                  </label>
+                </div>
               {/each}
             </div>
           {/if}
@@ -1053,17 +1176,6 @@
           </button>
           {#if openSections.koepel}
             <div class="accordion-content">
-              <div class="visual-toggle-container">
-                <span class="toggle-text">Toon kleuren per koepel</span>
-                <label class="switch">
-                  <input
-                    type="checkbox"
-                    checked={visualMode === "koepel"}
-                    onchange={() => handleVisualToggle("koepel")}
-                  />
-                  <span class="slider"></span>
-                </label>
-              </div>
               <hr class="separator" />
               {#each uniqueKoepels as koepel}
                 <label class="filter-item">
@@ -1074,11 +1186,6 @@
                       (selectedKoepels = toggleFilter(selectedKoepels, koepel))}
                   />
                   <span class="filter-text">{koepel}</span>
-                  <span
-                    class="color-swatch"
-                    style="background-color: {KOEPEL_COLORS[koepel] ||
-                      KOEPEL_COLORS.default}"
-                  ></span>
                 </label>
               {/each}
             </div>
@@ -1147,8 +1254,41 @@
     </aside>
 
     <!-- Map Container -->
-    <div class="map-container" bind:this={mapContainer}>
-      {#if !isMobile && showQrBlock}{/if}
+    <div
+      class="map-container"
+      class:has-selected-marker={selectedPlace != null}
+      bind:this={mapContainer}
+    ></div>
+
+    <!-- Basemap Toggle (Top Right) -->
+    <div
+      class="basemap-toggle"
+      class:has-popup={selectedPlace != null}
+      role="group"
+      aria-label="Kies achtergrondkaart"
+    >
+      <button
+        type="button"
+        class="basemap-toggle-btn"
+        class:active={activeBasemap === "satellite"}
+        onclick={() => setBasemap("satellite")}
+        aria-pressed={activeBasemap === "satellite"}
+        title="PDOK Satellietbeeld"
+      >
+        <i class="ph ph-planet"></i>
+        <span>Satelliet</span>
+      </button>
+      <button
+        type="button"
+        class="basemap-toggle-btn"
+        class:active={activeBasemap === "carto"}
+        onclick={() => setBasemap("carto")}
+        aria-pressed={activeBasemap === "carto"}
+        title="CARTO Positron (Lichtgrijs)"
+      >
+        <i class="ph ph-map-trifold"></i>
+        <span>CARTO</span>
+      </button>
     </div>
 
     {#if selectedPlace}
@@ -1184,20 +1324,35 @@
           </div>
 
           <div class="popup-info-row domains-row">
-            <span class="label">Domeinen</span>
-            <div class="popup-tags">
-              {#each [...new Set((selectedPlace.domeinen || "")
+            <span class="label">Domein-waarden</span>
+            {#if true}
+              {@const domeinList = [
+                ...new Set(
+                  (selectedPlace.domeinen || "")
                     .split(";")
-                    .map((d) => d.trim()))] as d}
-                <span
-                  class="p-tag domain-name-tag"
-                  style="background-color: {DOMEIN_COLORS[d.trim()] ||
-                    DOMEIN_COLORS.default}"
-                >
-                  {d.trim()}
-                </span>
-              {/each}
-            </div>
+                    .map((d) => d.trim()),
+                ),
+              ].filter(Boolean)}
+              {@const hoofd =
+                (selectedPlace.hoofddomein || "").trim() || domeinList[0] || ""}
+              {@const rest = domeinList.filter((d) => d !== hoofd)}
+              <div class="popup-tags domein-tags-row">
+                {#if hoofd}
+                  <span
+                    class="p-tag domein-tag domein-tag--main"
+                    style="background-color: {DOMEIN_COLORS[hoofd] ||
+                      DOMEIN_COLORS.default};">{hoofd}</span
+                  >
+                {/if}
+                {#each rest as d}
+                  <span
+                    class="p-tag domein-tag"
+                    style="background-color: {DOMEIN_COLORS[d] ||
+                      DOMEIN_COLORS.default};">{d}</span
+                  >
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <div class="popup-info-row koepel-row">
@@ -1262,8 +1417,8 @@
           voor de toekomst. Op het gebied van circulariteit, energie,
           mobiliteit, natuur, voedsel, werken en wonen ontstaan praktijken die
           niet wachten op beleid, maar handelen vanuit maatschappelijke noodzaak
-          en verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden door
-          een gedeelde zoektocht.
+          en verbeeldingskracht. Elk op hun eigen domein-waarde(n) maar
+          verbonden door een gedeelde zoektocht.
         </p>
       </div>
 
@@ -1271,8 +1426,8 @@
         <strong>OVER DEZE KAART</strong>
         <p>
           Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
-          verdeeld over verschillende categorieën en domeinen. De kaart is niet
-          volledig, maar geeft een eerste indruk van de diversiteit aan
+          verdeeld over verschillende categorieën en domein-waarden. De kaart is
+          niet volledig, maar geeft een eerste indruk van de diversiteit aan
           initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
           in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
           urgentie in een wijk of gemeenschap, en werken daardoor juist
@@ -1289,7 +1444,7 @@
     <div class="info-column block-middle">
       <h2>LEGENDA</h2>
       <p>
-        Hieronder vind je een uitleg van de categorieën en domeinen die we
+        Hieronder vind je een uitleg van de categorieën en domein-waarden die we
         gebruiken om de initiatieven te ordenen.
       </p>
       <div class="category-list">
@@ -1330,15 +1485,17 @@
 
         <div class="category-item">
           <span
-            class="domein-icon ph ph-house"
-            style="color: {DOMEIN_COLORS['Wonen']}"
+            class="domein-color-square"
+            style="width: 18px; height: 18px; border-radius: 4px; background-color: {DOMEIN_COLORS[
+              'Wonen'
+            ]};"
             aria-hidden="true"
           ></span>
           <div class="category-text">
-            <strong>Domeinen</strong>
+            <strong>Domein-waarden</strong>
             <p>
-              De initiatieven zijn onderverdeeld in domeinen. Sommige
-              initiatieven vallen onder meerdere domeinen.
+              De initiatieven zijn onderverdeeld in domein-waarden. Sommige
+              initiatieven vallen onder meerdere domein-waarden.
             </p>
           </div>
         </div>
@@ -1353,12 +1510,7 @@
         email naar <a href="mailto:initiatiefkracht@gmail.com"
           >initiatiefkracht@gmail.com</a
         >. Of wil je je eigen initiatief op de kaart hebben? Meld jouw
-        initiatief
-        <a
-          href="https://forms.gle/2L41WPykgQH5QRAY7"
-          target="_blank"
-          rel="noopener noreferrer">hier</a
-        > aan!
+        initiatief aan via het formulier hieronder!
       </p>
     </div>
 
@@ -1386,13 +1538,29 @@
     <div class="footer-content">
       <p>
         Deze kaart is ontwikkeld door
-        <a href="https://airrotterdam.eu"> AIR </a>, in samenwerking met
-        <a href="https://groen010.nl"> Groen010 </a>.
+        <a href="https://airrotterdam.eu" target="_blank" rel="noopener">AIR</a
+        >, in samenwerking met
+        <a href="https://groen010.nl" target="_blank" rel="noopener">Groen010</a
+        >.
       </p>
 
       <div class="logos-section">
-        <img src="AIR.png" alt="AIR logo" class="org-logo" />
-        <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+        <a
+          href="https://airrotterdam.eu"
+          target="_blank"
+          rel="noopener"
+          aria-label="AIR website"
+        >
+          <img src="AIR.png" alt="AIR logo" class="org-logo" />
+        </a>
+        <a
+          href="https://groen010.nl"
+          target="_blank"
+          rel="noopener"
+          aria-label="Groen010 website"
+        >
+          <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+        </a>
       </div>
     </div>
   </footer>
@@ -1490,9 +1658,10 @@
     position: relative;
     width: 98%;
     max-width: 1990px;
-    height: 83vh;
-    min-height: 600px;
-    margin: 0 auto 10px auto;
+    height: calc(100vh - 170px);
+    height: calc(100dvh - 170px);
+    min-height: 480px;
+    margin: 0 auto;
     overflow: hidden;
     box-sizing: border-box;
   }
@@ -1538,30 +1707,7 @@
     background: rgba(0, 0, 0, 0.2);
   }
 
-  .mobile-header {
-    display: none;
-  }
-
   @media (max-width: 900px) {
-    .mobile-header {
-      display: flex;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 60px;
-      background: #ffffff;
-      color: #5d69fb;
-      font-family: inherit;
-      font-weight: 900;
-      font-size: 1.4rem;
-      align-items: center;
-      justify-content: center;
-      z-index: 2500;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
     .fixed-air-popup {
       top: 15px !important;
       bottom: auto !important;
@@ -1576,6 +1722,20 @@
       border: 1px solid rgba(0, 0, 0, 0.05) !important;
       overflow-y: auto !important;
       z-index: 2010 !important;
+    }
+
+    .basemap-toggle {
+      top: 10px;
+      right: 10px;
+    }
+
+    .basemap-toggle.has-popup {
+      right: 10px;
+    }
+
+    .basemap-toggle-btn {
+      padding: 5px 9px;
+      font-size: 0.72rem;
     }
 
     .sidebar.open {
@@ -1626,10 +1786,6 @@
       padding-top: 4px;
     }
 
-    .brand,
-    .sidebar-collapse {
-      display: none !important;
-    }
     .accordion-content {
       max-height: none;
       overflow: visible;
@@ -1689,13 +1845,6 @@
       margin-bottom: 4px !important;
     }
 
-    .popup-footer {
-      width: 100%;
-      margin-top: 4px !important;
-      padding-top: 0 !important;
-      border-top: none !important;
-    }
-
     .popup-link {
       font-size: 10px !important;
       padding-bottom: 4px !important;
@@ -1729,20 +1878,6 @@
     display: none;
   }
 
-  .brand {
-    padding: 24px 20px;
-    font-weight: 900;
-    font-size: 1.4rem;
-    letter-spacing: -0.5px;
-    color: #5d69fb;
-    background-color: #ffffff;
-    text-align: center;
-  }
-  .location-filter {
-    padding: 16px 20px;
-    border-bottom: 1px solid #e0ddd5;
-    background: #ffffff;
-  }
   .search-group {
     margin-bottom: 12px;
     position: relative;
@@ -1837,18 +1972,20 @@
     padding: 0 20px 20px 20px;
     text-align: left;
   }
-  .accordion-content p {
-    font-size: 0.8rem;
-    color: #666;
-    line-height: 1.4;
-    margin: 0;
-  }
 
   .accordion-divider {
     height: 1px;
     background: rgba(0, 0, 0, 0.05);
     margin: 12px 0;
     border: none;
+  }
+
+  .filter-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 4px;
   }
 
   .filter-item {
@@ -1889,98 +2026,6 @@
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin-bottom: 0;
   }
-  .qr-block {
-    padding: 16px 20px;
-    background: transparent;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    text-align: left;
-  }
-  .qr-info {
-    padding: 16px 20px;
-    background: transparent;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    font-size: 0.95rem;
-    line-height: 1.6;
-    letter-spacing: 0.3px;
-    color: #5d69fb;
-  }
-  .qr-info p {
-    margin: 0;
-    text-align: left;
-  }
-  .floating-qr-block {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    padding: 24px;
-    width: fit-content;
-    max-width: 70%;
-    z-index: 999;
-  }
-  .qr-close-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    font-size: 20px;
-    transition: color 0.2s ease;
-  }
-  .qr-close-btn:hover {
-    color: #5d69fb;
-  }
-  .qr-content {
-    display: grid;
-    grid-template-columns: auto auto auto;
-    align-items: center;
-    gap: 24px;
-  }
-
-  .qr-info-text {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    letter-spacing: 0.3px;
-    color: #666;
-    margin: 0;
-    text-align: left;
-    max-width: 320px;
-  }
-
-  .qr-code-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .qr-code-wrap img {
-    max-width: 120px;
-    width: 120px;
-    display: block;
-  }
-
-  .qr-scan-text {
-    font-size: 0.85rem;
-    margin: 0;
-    color: #000;
-    font-weight: 500;
-    line-height: 1.6;
-    text-align: left;
-    width: 110px;
-    flex-shrink: 0;
-  }
-
-  /* legacy selectors kept for compatibility with other layout variants */
 
   .stats strong {
     color: #5d69fb;
@@ -1990,67 +2035,10 @@
     accent-color: #5d69fb;
     cursor: pointer;
   }
-  .visual-toggle-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-  }
-  .toggle-text {
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #666;
-  }
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 34px;
-    height: 20px;
-  }
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #e0ddd5;
-    transition: 0.4s;
-    border-radius: 20px;
-  }
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
-  }
-  input:checked + .slider {
-    background-color: #5d69fb;
-  }
-  input:checked + .slider:before {
-    transform: translateX(14px);
-  }
   .separator {
     border: 0;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
     margin: 12px 0;
-  }
-  .color-swatch {
-    width: 12px;
-    height: 12px;
-    display: inline-block;
-    border-radius: 3px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
   }
   .map-container {
     width: 100%;
@@ -2082,6 +2070,65 @@
     overflow-y: auto;
     border: 1px solid rgba(255, 255, 255, 0.25);
     box-sizing: border-box;
+  }
+
+  /* BASEMAP TOGGLE (Top Right) */
+  .basemap-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1500;
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    padding: 3px;
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.1),
+      0 1px 3px rgba(0, 0, 0, 0.05);
+    gap: 3px;
+    transition:
+      right 0.3s cubic-bezier(0.1, 1, 0.1, 1),
+      top 0.3s ease;
+  }
+
+  .basemap-toggle.has-popup {
+    right: 330px;
+  }
+
+  .basemap-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    color: #555555;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .basemap-toggle-btn i {
+    font-size: 14px;
+  }
+
+  .basemap-toggle-btn:hover:not(.active) {
+    color: #111111;
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .basemap-toggle-btn.active {
+    background: #5d69fb;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(93, 105, 251, 0.35);
   }
   .popup-top-bar {
     display: flex;
@@ -2143,16 +2190,6 @@
     display: block;
     margin-bottom: 4px;
   }
-  .popup-value {
-    font-size: 0.85rem;
-    color: #333;
-    font-weight: 500;
-  }
-  .popup-footer {
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid #eee;
-  }
 
   @keyframes popup-slide-in {
     from {
@@ -2167,9 +2204,7 @@
 
   .p-tag {
     font-size: 10px;
-    padding: 3px 6px;
-    margin-right: 4px;
-    margin-bottom: 4px;
+    padding: 2px 6px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     text-transform: uppercase;
     font-weight: bold;
@@ -2177,14 +2212,20 @@
     display: inline-block;
     border-radius: 5px;
   }
-  .domain-name-tag {
-    text-align: center;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    width: fit-content;
-    height: fit-content;
+  /* Regular domein tags — compact, short */
+  .domein-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    line-height: 1.3;
+  }
+  /* Hoofddomein tag — larger, overrides .domein-tag */
+  .domein-tag--main {
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: bold;
+    letter-spacing: 0.03em;
   }
   a.p-tag {
     cursor: pointer;
@@ -2202,6 +2243,8 @@
   .popup-tags {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 4px;
     margin-top: 8px;
   }
   .popup-link {
@@ -2220,29 +2263,51 @@
 
   :global(.marker-container) {
     z-index: 100;
+    will-change: transform;
+    pointer-events: auto;
   }
   :global(.marker-container:hover) {
     z-index: 1000;
   }
 
   :global(.air-marker) {
+    width: 26px;
     min-width: 26px;
     height: 26px;
-    border: 2px solid #737ac6;
-    border-radius: 13px;
+    border: none;
+    border-radius: 0;
     cursor: pointer;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-    background: #ffffff;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 0 4px;
+    padding: 0;
+    overflow: visible;
     box-sizing: border-box;
-    transition:
-      transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-      box-shadow 0.25s ease,
-      border-color 0.25s ease;
+    transform-origin: 50% 50%;
+    transition: opacity 0.2s ease;
+    /* filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); */
+    will-change: transform;
+    backface-visibility: hidden;
+    /* Baseline transform — overridden by the dynamic CSSStyleSheet on zoom */
+    transform: scale(1) translateZ(0);
+  }
+
+  :global(.air-marker .point-outer-circle),
+  :global(.air-marker .outer-droplet) {
+    stroke: #ffffff;
+    stroke-width: 0px;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+
+  :global(.air-marker .area-outer-circle) {
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+  }
+
+  :global(.air-marker .inner-circle) {
+    stroke: #ffffff !important;
+    stroke-width: 0px !important;
   }
 
   :global(.air-marker i) {
@@ -2251,42 +2316,63 @@
   }
 
   :global(.marker-container:hover .air-marker) {
-    transform: scale(1.3);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transition: filter 0.15s ease-out;
   }
 
   :global(.air-marker.active-glow) {
-    border: 2.5px solid #5d69fb;
-    box-shadow:
-      0 0 0 3px #5d69fb33,
-      0 0 15px 8px rgba(132, 80, 255, 0.15),
-      0 2px 6px rgba(0, 0, 0, 0.2);
-    transform: scale(1.1);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+  }
+
+  :global(.map-container.has-selected-marker .air-marker) {
+    opacity: 0.4;
+  }
+
+  :global(.map-container.has-selected-marker .air-marker.active-glow) {
+    opacity: 1;
   }
 
   :global(.air-area-marker) {
-    /* border: 2px solid #ffffff; */
-    box-shadow:
-      0 0 0 3px #5d69fb90,
-      0 0 15px 8px rgba(132, 80, 255, 0.1),
-      0 2px 6px rgba(0, 0, 0, 0.2);
-    min-width: 24px;
-    height: 24px;
+    width: 26px;
+    min-width: 26px;
+    height: 26px;
+    border-radius: 0;
+    transform-origin: 50% 50% !important;
+    filter: none;
+    will-change: transform;
+    backface-visibility: hidden;
+    /* Baseline transform — overridden by the dynamic CSSStyleSheet on zoom */
+    transform: scale(1) translateZ(0);
+  }
+
+  :global(.area-rings-group),
+  :global(.area-extra-ring) {
+    pointer-events: none;
+  }
+
+  :global(.area-rings-group) {
+    opacity: 0;
+    transition: opacity 0.22s ease-out;
+  }
+
+  :global(.marker-container:hover .air-area-marker),
+  :global(.air-area-marker:hover),
+  :global(.air-area-marker.active-glow) {
+    filter: none !important;
+  }
+
+  /* When hovering over the area location marker, the 3 circles appear */
+  :global(.marker-container:hover .air-area-marker .area-rings-group),
+  :global(.air-area-marker:hover .area-rings-group) {
+    opacity: 1;
+  }
+
+  /* When clicking, the circles remain */
+  :global(.air-area-marker.active-glow .area-rings-group) {
+    opacity: 1;
   }
 
   :global(.air-area-marker i) {
-    font-size: 12px;
-  }
-  .logos-section {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-top: 16px;
-  }
-
-  .org-logo {
-    height: 80px;
-    object-fit: contain;
+    font-size: 13px;
   }
 
   @keyframes area-fade-in {
@@ -2313,8 +2399,15 @@
     text-align: center;
   }
 
-  .location-filter .filter-item {
-    justify-content: space-between;
+  .domein-color-square {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
 
   .legend-text {
@@ -2324,26 +2417,30 @@
 
   .legend-marker {
     display: inline-block;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     vertical-align: middle;
     border-radius: 50%;
     margin-left: 0;
     box-sizing: border-box;
     background: #fff;
-    border: 2px solid #737ac6;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     flex: 0 0 auto;
+  }
+
+  .legend-marker-point {
+    background: #5d69fb;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   }
 
   .legend-marker-area {
     background: #5d69fb;
     box-shadow:
-      0 0 0 3px #5d69fb90,
-      0 0 15px 8px rgba(132, 80, 255, 0.1),
-      0 2px 6px rgba(0, 0, 0, 0.2);
+      0 0 0 3px rgba(93, 105, 251, 0.45),
+      0 0 10px 4px rgba(132, 80, 255, 0.1),
+      0 2px 5px rgba(0, 0, 0, 0.2);
     border: none;
-    opacity: 0.6;
+    opacity: 0.95;
     max-width: 18px;
     max-height: 18px;
   }
@@ -2352,17 +2449,6 @@
     background: #fbbf72;
     border-radius: 4px;
     border: 1px solid rgba(0, 0, 0, 0.1);
-  }
-
-  .waardebloem-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: none;
-    text-align: center;
   }
 
   .waardebloem-icon-btn {
@@ -2496,20 +2582,6 @@
     font-size: 1.5rem;
   }
 
-  .initiatives-intro {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-
-  .initiatives-intro .lead {
-    font-size: 0.85rem;
-    color: #333;
-    line-height: 1.4;
-    margin: 0;
-  }
-
   .intro-section {
     margin-bottom: 8px;
     text-align: left;
@@ -2555,18 +2627,6 @@
     font-size: 0.8rem !important;
   }
 
-  .initiatives-intro .cta {
-    font-size: 0.8rem;
-    color: #666;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    padding-top: 12px;
-    margin-top: 4px;
-    line-height: 1.4;
-  }
-
-  .initiatives-intro .cta strong {
-    color: #5d69fb;
-  }
 
   .bottom-info-section {
     display: grid;
@@ -2606,9 +2666,6 @@
     color: #444444;
   }
 
-  .partners-logos {
-    padding-top: 15px;
-  }
 
   .block-contribute p {
     margin: 0;
@@ -2839,8 +2896,9 @@
     align-items: center;
     position: relative;
     z-index: 10;
-    margin-bottom: 10px;
-    margin-top: 0px;
+    width: 100%;
+    height: 80px;
+    margin: 0;
   }
 
   .scroll-down-btn {
@@ -2910,20 +2968,23 @@
   .bottom-footer {
     width: 100%;
     background: #ffffff;
-    padding: 40px 0;
+    padding: 48px 24px;
     border-top: 1px solid #b1b1b1;
-    width: 60%;
-    margin: 0 auto;
+    margin-top: 40px;
     box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .footer-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
-    width: 98%;
-    max-width: 1200px;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 800px;
     margin: 0 auto;
     text-align: center;
   }
@@ -2933,18 +2994,39 @@
     color: #444444;
     margin: 0;
     font-family: "Inter", sans-serif;
+    text-align: center;
+    line-height: 1.6;
   }
 
-  .footer-logos {
+  .footer-content a {
+    color: #5d69fb;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  .footer-content a:hover {
+    color: #3b49e0;
+  }
+
+  .logos-section {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 30px;
+    gap: 32px;
+    margin-top: 8px;
   }
 
-  .footer-logos img {
-    height: 48px;
+  .org-logo {
+    height: 64px;
     width: auto;
     object-fit: contain;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .logos-section a:hover .org-logo {
+    transform: scale(1.05);
+    opacity: 0.85;
   }
 </style>
