@@ -3,26 +3,18 @@
   import maplibregl from "maplibre-gl";
   import Papa from "papaparse";
   import "maplibre-gl/dist/maplibre-gl.css";
-  import { Protocol } from "pmtiles";
-  import { getProtomapsWhiteLayers } from "./lib/basemap/index.js";
-
-  try {
-    const protocol = new Protocol();
-    maplibregl.addProtocol("pmtiles", protocol.tile);
-  } catch {
-    // Protocol already registered in environment
-  }
+  const CARTO_POSITRON_STYLE =
+    "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
   let mapContainer = $state();
   let map = $state();
   let mapLoaded = $state(false);
-  let activeBasemap = $state("satellite");
-  const protomapsLayers = getProtomapsWhiteLayers("nl");
+  let activeBasemap = $state("carto");
+  let cartoLayers = [];
   let allPlaces = $state([]);
   let markers = [];
   let markerMap = new Map();
   let visualMode = $state("default");
-  let activeHeatmapDomain = $state(null);
   let allGeoFeatures = $state([]);
 
   let selectedPlace = $state(null);
@@ -130,10 +122,13 @@
         isSat ? "visible" : "none",
       );
     }
-    const protoVis = isSat ? "none" : "visible";
-    for (const l of protomapsLayers) {
-      if (map.getLayer(l.id)) {
-        map.setLayoutProperty(l.id, "visibility", protoVis);
+    for (const { id, defaultVisibility } of cartoLayers) {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(
+          id,
+          "visibility",
+          isSat ? "none" : defaultVisibility,
+        );
       }
     }
   }
@@ -146,53 +141,7 @@
       renderWorldCopies: false,
       trackResize: true,
       pitchWithRotate: false,
-      style: {
-        version: 8,
-        glyphs:
-          "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
-        sprite: "https://protomaps.github.io/basemaps-assets/sprites/v4/white",
-        sources: {
-          protomaps: {
-            type: "vector",
-            url: "https://api.protomaps.com/tiles/v4.json?key=ca7652ec836f269a",
-            attribution:
-              '© <a href="https://openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a> / <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a>',
-          },
-          "pdok-luchtfoto": {
-            type: "raster",
-            tiles: [
-              "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/OGC:1.0:GoogleMapsCompatible/{z}/{x}/{y}.jpeg",
-            ],
-            tileSize: 256,
-            maxzoom: 19,
-            attribution:
-              '© <a href="https://www.pdok.nl/" target="_blank" rel="noopener">PDOK</a> / Luchtfoto',
-          },
-        },
-        layers: [
-          ...protomapsLayers.map((layer) => ({
-            ...layer,
-            layout: {
-              ...layer.layout,
-              visibility: activeBasemap === "protomaps" ? "visible" : "none",
-            },
-          })),
-          {
-            id: "pdok-luchtfoto-layer",
-            type: "raster",
-            source: "pdok-luchtfoto",
-            layout: {
-              visibility: activeBasemap === "satellite" ? "visible" : "none",
-            },
-            paint: {
-              "raster-saturation": -1,
-              "raster-contrast": 0.3,
-              "raster-brightness-min": 0.6,
-              "raster-brightness-max": 1.0,
-            },
-          },
-        ],
-      },
+      style: CARTO_POSITRON_STYLE,
       center: [4.47, 51.915],
       zoom: 12.5,
       attributionControl: true,
@@ -247,6 +196,48 @@
     });
 
     map.on("load", () => {
+      // Record CARTO vector style layer IDs and default visibility
+      cartoLayers = (map.getStyle().layers || []).map((l) => ({
+        id: l.id,
+        defaultVisibility: l.layout?.visibility || "visible",
+      }));
+
+      // Add PDOK satellite raster source
+      map.addSource("pdok-luchtfoto", {
+        type: "raster",
+        tiles: [
+          "https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/OGC:1.0:GoogleMapsCompatible/{z}/{x}/{y}.jpeg",
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution:
+          '© <a href="https://www.pdok.nl/" target="_blank" rel="noopener">PDOK</a> / Luchtfoto',
+      });
+
+      // Add PDOK satellite layer
+      map.addLayer({
+        id: "pdok-luchtfoto-layer",
+        type: "raster",
+        source: "pdok-luchtfoto",
+        layout: {
+          visibility: activeBasemap === "satellite" ? "visible" : "none",
+        },
+        paint: {
+          "raster-saturation": -1,
+          "raster-contrast": 0.3,
+          "raster-brightness-min": 0.6,
+          "raster-brightness-max": 1.0,
+        },
+      });
+
+      if (activeBasemap === "satellite") {
+        for (const { id } of cartoLayers) {
+          if (map.getLayer(id)) {
+            map.setLayoutProperty(id, "visibility", "none");
+          }
+        }
+      }
+
       map.addSource("rotterdam-buurten", {
         type: "geojson",
         data: geoData,
@@ -321,30 +312,17 @@
     Wonen: "#E63114",
     Welzijn: "#F5BD02",
     Cultuur: "#FF6D1D",
-    Klimaat: "#C0E2FF",
+    Vrijplaats: "#D2B2F5",
+    Werk: "#FE7EAE",
+    Educatie: "#FFEE51",
+    Sociaal: "#B50425",
+    Klimaat: "#43BB9F",
     Voedsel: "#377E42",
     Groen: "#C0DA81",
-    Circulair: "#D2B2F5",
+    Circulair: "#AEEFFF",
     Mobiliteit: "#0990CF",
-    Energie: "#FE7EAE",
-    Vrijplaats: "#AEEFFF",
-    Werk: "#4D2AFF",
-    Educatie: "#FFEE51",
-    Sociaal: "#43BB9F",
+    Energie: "#4D2AFF",
     default: "#5d69fb",
-  };
-
-  const DOMEIN_ICONS = {
-    Wonen: "ph-house",
-    Welzijn: "ph-heartbeat",
-    Cultuur: "ph-paint-brush-broad",
-    Klimaat: "ph-cloud-sun",
-    Voedsel: "ph-fork-knife",
-    Groen: "ph-tree",
-    Circulair: "ph-recycle",
-    Mobiliteit: "ph-bicycle",
-    Energie: "ph-lightning",
-    default: "ph-map-pin",
   };
 
   const GEBIED_COLORS = {
@@ -409,6 +387,7 @@
     "Welzijnscoalitie Delfshaven": "https://welzijnscoalitie.nl/",
     Thuismakerscollectief: "https://thuismakerscollectief.nl/",
     RoCoCo: "https://rococo.coop/",
+    "Warm Rotterdam": "https://www.warmrotterdam.nl/",
   };
 
   let openSections = $state({
@@ -570,14 +549,23 @@
   }
   let uniqueKoepels = $derived(
     [
-      ...new Set(
-        allPlaces.flatMap((p) => [
+      ...new Set([
+        ...Object.keys(KOEPEL_COLORS).filter((k) => k !== "default"),
+        ...allPlaces.flatMap((p) => [
           ...new Set(p.koepels?.split(";").map((k) => k.trim())),
         ]),
-      ),
+      ]),
     ]
       .filter(Boolean)
-      .sort(),
+      .sort((a, b) => {
+        const koepelOrder = Object.keys(KOEPEL_COLORS);
+        const aIndex = koepelOrder.indexOf(a);
+        const bIndex = koepelOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      }),
   );
   let uniqueDomeinen = $derived(
     [
@@ -1657,13 +1645,13 @@
       <button
         type="button"
         class="basemap-toggle-btn"
-        class:active={activeBasemap === "protomaps"}
-        onclick={() => setBasemap("protomaps")}
-        aria-pressed={activeBasemap === "protomaps"}
-        title="Protomap (Wit)"
+        class:active={activeBasemap === "carto"}
+        onclick={() => setBasemap("carto")}
+        aria-pressed={activeBasemap === "carto"}
+        title="CARTO Positron (Lichtgrijs)"
       >
         <i class="ph ph-map-trifold"></i>
-        <span>Protomap</span>
+        <span>CARTO</span>
       </button>
     </div>
 
@@ -1793,8 +1781,8 @@
           voor de toekomst. Op het gebied van circulariteit, energie,
           mobiliteit, natuur, voedsel, werken en wonen ontstaan praktijken die
           niet wachten op beleid, maar handelen vanuit maatschappelijke noodzaak
-          en verbeeldingskracht. Elk op hun eigen domein(en) maar verbonden door
-          een gedeelde zoektocht.
+          en verbeeldingskracht. Elk op hun eigen domein-waarde(n) maar
+          verbonden door een gedeelde zoektocht.
         </p>
       </div>
 
@@ -1802,8 +1790,8 @@
         <strong>OVER DEZE KAART</strong>
         <p>
           Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
-          verdeeld over verschillende categorieën en domeinen. De kaart is niet
-          volledig, maar geeft een eerste indruk van de diversiteit aan
+          verdeeld over verschillende categorieën en domein-waarden. De kaart is
+          niet volledig, maar geeft een eerste indruk van de diversiteit aan
           initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
           in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
           urgentie in een wijk of gemeenschap, en werken daardoor juist
@@ -1907,189 +1895,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Full Width: Add Initiative Form -->
-    <div class="info-column block-add-initiative-full">
-      <div
-        class="add-initiative-form"
-        style="margin-top: 0; padding-top: 0; border-top: none;"
-      >
-        <h3>Nieuw initiatief toevoegen</h3>
-
-        {#if formStatusMessage}
-          <div class="form-status-alert {formStatusType}">
-            <p>{formStatusMessage}</p>
-          </div>
-        {/if}
-
-        <div class="form-group">
-          <label for="init-name">Naam initiatief *</label>
-          <input
-            id="init-name"
-            type="text"
-            bind:value={newInitiative.name}
-            placeholder="Bijv. Buurttuin De Groene Oase"
-          />
-        </div>
-
-        <div class="form-row">
-          <div class="form-group col-half">
-            <label>Locatie selecteren *</label>
-            <button
-              type="button"
-              class="btn-select-location {isSelectingLocation ? 'active' : ''}"
-              onclick={() => {
-                isSelectingLocation = !isSelectingLocation;
-                if (isSelectingLocation && mapContainer) {
-                  mapContainer.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                  });
-                }
-              }}
-            >
-              <i
-                class="ph {isSelectingLocation
-                  ? 'ph-cursor-click'
-                  : 'ph-map-pin'}"
-              ></i>
-              {isSelectingLocation
-                ? "Klik nu op de kaart..."
-                : "Kies locatie op kaart"}
-            </button>
-          </div>
-
-          <div class="form-group col-half">
-            <label
-              >Gebied (Buurten) <span
-                style="font-size: 0.72rem; font-weight: normal; color: #666;"
-                >(vink één of meer aan)</span
-              ></label
-            >
-            <div class="buurten-checkbox-list">
-              {#each allPossibleBuurten as buurt}
-                <label class="buurt-checkbox-label">
-                  <input
-                    type="checkbox"
-                    value={buurt}
-                    checked={newInitiative.gebiedList.includes(buurt)}
-                    onchange={(e) => {
-                      if (e.target.checked) {
-                        newInitiative.gebiedList = [
-                          ...newInitiative.gebiedList,
-                          buurt,
-                        ];
-                      } else {
-                        newInitiative.gebiedList =
-                          newInitiative.gebiedList.filter((b) => b !== buurt);
-                      }
-                    }}
-                  />
-                  <span>{buurt}</span>
-                </label>
-              {/each}
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Domeinen (kies één of meer)</label>
-          <div class="domeinen-grid">
-            {#each Object.keys(DOMEIN_COLORS).filter((d) => d !== "default") as domain}
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  value={domain}
-                  checked={newInitiative.domeinen.includes(domain)}
-                  onchange={(e) => {
-                    if (e.target.checked) {
-                      newInitiative.domeinen = [
-                        ...newInitiative.domeinen,
-                        domain,
-                      ];
-                    } else {
-                      newInitiative.domeinen = newInitiative.domeinen.filter(
-                        (d) => d !== domain,
-                      );
-                    }
-                  }}
-                />
-                <span
-                  class="domain-tag-indicator"
-                  style="border-color: {DOMEIN_COLORS[
-                    domain
-                  ]}33; background-color: {newInitiative.domeinen.includes(
-                    domain,
-                  )
-                    ? DOMEIN_COLORS[domain] + '33'
-                    : '#f5f5f5'}; color: {newInitiative.domeinen.includes(
-                    domain,
-                  )
-                    ? '#111111'
-                    : '#666666'}; border: 1px solid {newInitiative.domeinen.includes(
-                    domain,
-                  )
-                    ? DOMEIN_COLORS[domain]
-                    : 'transparent'}"
-                >
-                  {domain}
-                </span>
-              </label>
-            {/each}
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group col-half">
-            <label for="init-website">Website URL</label>
-            <input
-              id="init-website"
-              type="url"
-              bind:value={newInitiative.website}
-              placeholder="https://example.com"
-            />
-          </div>
-          <div class="form-group col-half">
-            <label for="init-koepels">Koepels (Netwerk)</label>
-            <input
-              id="init-koepels"
-              type="text"
-              bind:value={newInitiative.koepels}
-              placeholder="Bijv. Groen010"
-            />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group col-half">
-            <label for="init-type">Initiatief Type</label>
-            <select id="init-type" bind:value={newInitiative.initiatief_type}>
-              <option value="plek">plek</option>
-              <option value="netwerk">netwerk</option>
-              <option value="wijk">wijk</option>
-            </select>
-          </div>
-          <div class="form-group col-half">
-            <label for="init-loc-type">Locatie Type</label>
-            <select id="init-loc-type" bind:value={newInitiative.location_type}>
-              <option value="point">point</option>
-              <option value="area">area</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button
-            type="button"
-            class="btn-save"
-            style="flex: 1;"
-            onclick={saveInitiative}
-          >
-            <i class="ph ph-plus-circle"></i> Toevoegen aan de kaart
-          </button>
-        </div>
-      </div>
-    </div>
   </section>
 
   <!-- Footer with Logos and Credits -->
@@ -2097,13 +1902,29 @@
     <div class="footer-content">
       <p>
         Deze kaart is ontwikkeld door
-        <a href="https://airrotterdam.eu"> AIR </a>, in samenwerking met
-        <a href="https://groen010.nl"> Groen010 </a>.
+        <a href="https://airrotterdam.eu" target="_blank" rel="noopener">AIR</a
+        >, in samenwerking met
+        <a href="https://groen010.nl" target="_blank" rel="noopener">Groen010</a
+        >.
       </p>
 
       <div class="logos-section">
-        <img src="AIR.png" alt="AIR logo" class="org-logo" />
-        <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+        <a
+          href="https://airrotterdam.eu"
+          target="_blank"
+          rel="noopener"
+          aria-label="AIR website"
+        >
+          <img src="AIR.png" alt="AIR logo" class="org-logo" />
+        </a>
+        <a
+          href="https://groen010.nl"
+          target="_blank"
+          rel="noopener"
+          aria-label="Groen010 website"
+        >
+          <img src="VG010_logo.png" alt="Groen010 logo" class="org-logo" />
+        </a>
       </div>
     </div>
   </footer>
@@ -2201,9 +2022,10 @@
     position: relative;
     width: 98%;
     max-width: 1990px;
-    height: 83vh;
-    min-height: 600px;
-    margin: 0 auto 10px auto;
+    height: calc(100vh - 170px);
+    height: calc(100dvh - 170px);
+    min-height: 480px;
+    margin: 0 auto;
     overflow: hidden;
     box-sizing: border-box;
   }
@@ -3142,17 +2964,6 @@
   :global(.air-area-marker i) {
     font-size: 13px;
   }
-  .logos-section {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin-top: 16px;
-  }
-
-  .org-logo {
-    height: 80px;
-    object-fit: contain;
-  }
 
   @keyframes area-fade-in {
     from {
@@ -3200,21 +3011,19 @@
 
   .legend-marker {
     display: inline-block;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     vertical-align: middle;
     border-radius: 50%;
     margin-left: 0;
     box-sizing: border-box;
     background: #fff;
-    border: 2px solid #737ac6;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     flex: 0 0 auto;
   }
 
   .legend-marker-point {
     background: #5d69fb;
-    border: 2.5px solid #ffffff;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   }
 
@@ -3987,8 +3796,9 @@
     align-items: center;
     position: relative;
     z-index: 10;
-    margin-bottom: 10px;
-    margin-top: 0px;
+    width: 100%;
+    height: 80px;
+    margin: 0;
   }
 
   .scroll-down-btn {
@@ -4058,20 +3868,23 @@
   .bottom-footer {
     width: 100%;
     background: #ffffff;
-    padding: 40px 0;
+    padding: 48px 24px;
     border-top: 1px solid #b1b1b1;
-    width: 60%;
-    margin: 0 auto;
+    margin-top: 40px;
     box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 
   .footer-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
-    width: 98%;
-    max-width: 1200px;
+    justify-content: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 800px;
     margin: 0 auto;
     text-align: center;
   }
@@ -4081,19 +3894,40 @@
     color: #444444;
     margin: 0;
     font-family: "Inter", sans-serif;
+    text-align: center;
+    line-height: 1.6;
   }
 
-  .footer-logos {
+  .footer-content a {
+    color: #5d69fb;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  .footer-content a:hover {
+    color: #3b49e0;
+  }
+
+  .logos-section {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 30px;
+    gap: 32px;
+    margin-top: 8px;
   }
 
-  .footer-logos img {
-    height: 48px;
+  .org-logo {
+    height: 64px;
     width: auto;
     object-fit: contain;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .logos-section a:hover .org-logo {
+    transform: scale(1.05);
+    opacity: 0.85;
   }
 
   .domains-display {
