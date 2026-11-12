@@ -247,13 +247,13 @@
   const LARGE_AREA_ZOOM = 11;
 
   const DOMEIN_COLORS = {
-    Wonen: "#E63114",
+    Wonen: "#9C1000",
     Welzijn: "#F5BD02",
     Cultuur: "#FF6D1D",
     Vrijplaats: "#D2B2F5",
     Werk: "#FE7EAE",
     Educatie: "#FFEE51",
-    Sociaal: "#B50425",
+    Sociaal: "#FF245D",
     Klimaat: "#43BB9F",
     Voedsel: "#377E42",
     Groen: "#C0DA81",
@@ -339,6 +339,8 @@
   }
 
   let infoSection = $state();
+  let stadmakersSection = $state();
+
   let isScrolledDown = $state(false);
 
   function handleScroll() {
@@ -349,6 +351,15 @@
     if (infoSection) {
       const headerHeight = 110; // sticky top-header height + buffer
       const rect = infoSection.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - headerHeight;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+    }
+  }
+
+  function scrollToStadmakers() {
+    if (stadmakersSection) {
+      const headerHeight = 110; // sticky top-header height + buffer
+      const rect = stadmakersSection.getBoundingClientRect();
       const targetY = window.scrollY + rect.top - headerHeight;
       window.scrollTo({ top: targetY, behavior: "smooth" });
     }
@@ -419,7 +430,6 @@
     }
 
     selectedPlace = place;
-    hoveredSliceDomain = null;
     if (isMobile) {
       mobileSidebarOpen = false;
     }
@@ -1055,7 +1065,12 @@
   <!-- Top Header Bar -->
   <header class="top-header">
     <div class="header-content">
-      <h1 class="top-title">IN OPBOUW:<br />INITIATIEFKRACHT IN KAART</h1>
+      <div class="header-titles">
+        <h1 class="top-title">IN OPBOUW:<br />INITIATIEFKRACHT IN KAART</h1>
+        <button class="top-subtitle" onclick={scrollToInfo} type="button">
+          WERKPLAATS STADMAKERSACADEMIE
+        </button>
+      </div>
       <button
         class="info-scroll-trigger"
         onclick={isScrolledDown ? scrollToMap : scrollToInfo}
@@ -1275,7 +1290,6 @@
         aria-pressed={activeBasemap === "satellite"}
         title="PDOK Satellietbeeld"
       >
-        <i class="ph ph-planet"></i>
         <span>Satelliet</span>
       </button>
       <button
@@ -1286,7 +1300,6 @@
         aria-pressed={activeBasemap === "carto"}
         title="CARTO Positron (Lichtgrijs)"
       >
-        <i class="ph ph-map-trifold"></i>
         <span>CARTO</span>
       </button>
     </div>
@@ -1405,6 +1418,30 @@
 
   <!-- Bottom Info Section -->
   <section class="bottom-info-section" bind:this={infoSection}>
+    <div class="info-column bottom-text">
+      <h2>WERKPLAATS STADMAKERSACADEMIE</h2>
+      <p>
+        Het Stadmakerscongres is sinds de eerste editie in 2014 een begrip in
+        Rotterdam geworden. Met jaarlijks meer dan 1.000 bezoekers is er bij
+        duizenden mensen uit alle Stadmakers geledingen - overheid, markt &
+        burgergezelschappen - veel kennis, ervaring en netwerk opgedaan. Onder
+        de noemer werkplaats Stadmakersacademie wordt deze gezamenlijke
+        leeragenda ontsloten zodat steeds meer mensen zich Stadmaker kunnen
+        noemen en initiatiefkracht een integraal onderdeel kan worden van werk-
+        en ontwikkelingsprocessen van de stad. Want dat is het doel: Hoe kunnen
+        de waarde, energie en gemeenschapskracht van lokale initiatieven op
+        verschillenden domeinen samen bijdragen aan de buurt, wijk en de stad? <br
+        />
+        <a
+          href="#stadmakersacademie"
+          onclick={(e) => {
+            e.preventDefault();
+            scrollToStadmakers();
+          }}>Lees hier meer over de stadmakersacademie.</a
+        >
+      </p>
+    </div>
+
     <!-- Left Column: Waarom deze kaart & Over deze kaart -->
     <div class="info-column block-left">
       <h2>INFORMATIE</h2>
@@ -1425,17 +1462,20 @@
       <div class="intro-section">
         <strong>OVER DEZE KAART</strong>
         <p>
-          Op deze kaart vind je een verzameling van initiatieven in Rotterdam,
-          verdeeld over verschillende categorieën en domein-waarden. De kaart is
-          niet volledig, maar geeft een eerste indruk van de diversiteit aan
-          initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
-          in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
-          urgentie in een wijk of gemeenschap, en werken daardoor juist
-          integraal en domeinoverstijgend. Toch hebben we gekozen voor een
-          categorisering om de veelzijdigheid van initiatiefkracht beter
-          leesbaar en navigeerbaar te maken. Zo hopen we dat initiatieven,
-          organisaties en bewoners elkaar makkelijker kunnen vinden, versterken
-          en ondersteunen.
+          Deze kaart is gemaakt als onderdeel van de tentoonstelling De Kracht
+          van Gemeenschap tijdens de Rotterdam Architectuur Maand 2026. Veel van
+          deze initiatieven en de netwerken waarin ze samenwerken zijn
+          gedocumenteerd in deze publicatie. Op deze kaart vind je een
+          verzameling van initiatieven in Rotterdam, verdeeld over verschillende
+          categorieën en domein-waarden. De kaart is niet volledig, maar geeft
+          een eerste indruk van de diversiteit aan initiatieven in de stad. Veel
+          initiatieven laten zich niet eenvoudig in één domein plaatsen. Ze
+          ontstaan vaak vanuit een behoefte of urgentie in een wijk of
+          gemeenschap, en werken daardoor juist integraal en domeinoverstijgend.
+          Toch hebben we gekozen voor een categorisering om de veelzijdigheid
+          van initiatiefkracht beter leesbaar en navigeerbaar te maken. Zo hopen
+          we dat initiatieven, organisaties en bewoners elkaar makkelijker
+          kunnen vinden, versterken en ondersteunen.
         </p>
       </div>
     </div>
@@ -1530,6 +1570,108 @@
           <img src="Waardebloem.png" alt="Waardebloem" />
         </button>
       </div>
+    </div>
+
+    <div class="info-column bottom-text" bind:this={stadmakersSection}>
+      <h2>WAT IS DE STADMAKERSACADEMIE?</h2>
+      <p>
+        De Stadmakersacademie is niet een aparte organisatie maar een
+        verzameling van vindplekken van kennis, ervaring en netwerk over het
+        Stadmaken.
+      </p>
+      <ul class="stadmakers-list">
+        <li>
+          Wil je meer weten over het Stadmaken? Het <a
+            href="https://archief.stadmakerscongres.nl/"
+            target="_blank"
+            rel="noopener noreferrer">Stadmakerscongres</a
+          >
+          heeft een archief van alle edities sinds 2014. Hier vind je ook verschillende
+          publicaties, podcasts en video's van
+          <a
+            href="https://stadmakerscongres.nl/category/broadcast/"
+            target="_blank"
+            rel="noopener noreferrer">Guest Urban Critics</a
+          >.
+        </li>
+        <li>
+          Zoek je verbinding in of met de buurt? Er is inmiddels ook een <a
+            href="https://welzijnscoalitie.nl/buurtmakerscongres"
+            target="_blank"
+            rel="noopener noreferrer">Buurtmakerscongres</a
+          >.
+        </li>
+        <li>
+          Het <a
+            href="https://huisvanactiefburgerschap.nl/"
+            target="_blank"
+            rel="noopener noreferrer">Huis van Actief Burgerschap</a
+          > organiseert maandelijkse bijeenkomsten in het Wijkpaleis.
+        </li>
+        <li>
+          De <a
+            href="https://wijkcooperatie.org/nl/updates/23_september_after_summer_school_opening_on_academisch_jaar/"
+            target="_blank"
+            rel="noopener noreferrer">Rotterdamse Kenniscoöperatie</a
+          > zet zich in voor het ophalen en verspreiden van kennis in en met de wijk.
+        </li>
+        <li>
+          <a
+            href="https://wijkwijs.nl/"
+            target="_blank"
+            rel="noopener noreferrer">Wijkwijs</a
+          > is een netwerk van lokale onderzoekscollectieven.
+        </li>
+        <li>
+          Bij kennisplatform <a
+            href="https://www.collectievekracht.eu/default.aspx"
+            target="_blank"
+            rel="noopener noreferrer">Collectieve Kracht</a
+          > kun je veel onderzoek en praktische ondersteuning vinden.
+        </li>
+        <li>
+          <a
+            href="https://www.mastercitydeveloper.nl/"
+            target="_blank"
+            rel="noopener noreferrer">Master City Developer</a
+          > is een postacademische opleiding over stedelijke ontwikkeling.
+        </li>
+        <li>
+          <a
+            href="https://www.schoolforthecity.nl/"
+            target="_blank"
+            rel="noopener noreferrer">Independent School for the City</a
+          > is een platform en speeltuin voor stedelijke denkers, doeners en ontwerpers.
+        </li>
+        <li>
+          De <a
+            href="https://nieuweinstituut.nl/projects/de-nieuwe-academie/after-summer-school-2026"
+            target="_blank"
+            rel="noopener noreferrer">After Summer School</a
+          > van het Nieuwe Instituut biedt een jaarlijks curriculum voor verandering.
+        </li>
+        <li>
+          <a
+            href="https://www.lsabewoners.nl/"
+            target="_blank"
+            rel="noopener noreferrer">LSA Bewoners</a
+          > is een vereniging van bewonersinitiatieven met een landelijk netwerk.
+        </li>
+        <li>
+          IABR heeft een podcastreeks <a
+            href="https://iabr.nl/search?search=gedeelde+%2B+grond"
+            target="_blank"
+            rel="noopener noreferrer">Gedeelde Grond</a
+          > over commons-initiatieven in Rotterdam West.
+        </li>
+        <li>
+          <a
+            href="https://drift.eur.nl/nl/onderwijs/"
+            target="_blank"
+            rel="noopener noreferrer">Drift Transition Academy</a
+          >, thuis in de transitieleer.
+        </li>
+      </ul>
     </div>
   </section>
 
@@ -1630,14 +1772,22 @@
 
   .top-header {
     background: #ffffff;
-    height: 90px;
+    min-height: 90px;
     display: flex;
     align-items: center;
-    padding: 0;
+    padding: 8px 0;
     position: sticky;
     top: 0;
     z-index: 2000;
+    box-sizing: border-box;
     /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 
   .top-title {
@@ -1648,10 +1798,36 @@
     letter-spacing: 0.5px;
     text-transform: uppercase;
     font-family: inherit;
-    vertical-align: text-bottom;
-    margin-top: 20px;
+    line-height: 1.15;
     text-align: left;
-    margin-bottom: 3px;
+  }
+
+  .top-subtitle {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #555555;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.2s ease;
+  }
+
+  .top-subtitle:hover {
+    color: #5d69fb;
+    text-decoration: underline;
+  }
+
+  .top-subtitle:focus,
+  .top-subtitle:active,
+  .top-subtitle:focus-visible {
+    outline: none;
+    border: none;
+    box-shadow: none;
   }
 
   .map-frame {
@@ -2627,7 +2803,6 @@
     font-size: 0.8rem !important;
   }
 
-
   .bottom-info-section {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2661,11 +2836,40 @@
     width: fit-content;
   }
 
-  .intro-section p {
+  .bottom-text {
+    grid-column: 1 / -1;
+    width: 100%;
+    border-top: 2px solid #f2f2f2;
+    font-size: 0.95rem;
+  }
+
+  .bottom-text p {
+    margin: 0;
     font-size: 0.95rem;
     color: #444444;
   }
 
+  .stadmakers-list {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #444444;
+    list-style-type: disc;
+  }
+
+  .bottom-text a {
+    color: #5d69fb;
+    text-decoration: underline;
+    font-weight: 600;
+  }
+
+  .intro-section p {
+    font-size: 0.95rem;
+    color: #444444;
+  }
 
   .block-contribute p {
     margin: 0;
@@ -2686,9 +2890,16 @@
       display: none !important;
     }
 
+    .header-titles {
+      margin-left: 36px !important;
+    }
+
     .top-title {
       font-size: 1.15rem !important;
-      margin-left: 36px !important;
+    }
+
+    .top-subtitle {
+      font-size: 0.8rem !important;
     }
 
     .map-frame {
