@@ -1463,19 +1463,18 @@
         <strong>OVER DEZE KAART</strong>
         <p>
           Deze kaart is gemaakt als onderdeel van de tentoonstelling De Kracht
-          van Gemeenschap tijdens de Rotterdam Architectuur Maand 2026. Veel van
-          deze initiatieven en de netwerken waarin ze samenwerken zijn
-          gedocumenteerd in deze publicatie. Op deze kaart vind je een
-          verzameling van initiatieven in Rotterdam, verdeeld over verschillende
-          categorieën en domein-waarden. De kaart is niet volledig, maar geeft
-          een eerste indruk van de diversiteit aan initiatieven in de stad. Veel
-          initiatieven laten zich niet eenvoudig in één domein plaatsen. Ze
-          ontstaan vaak vanuit een behoefte of urgentie in een wijk of
-          gemeenschap, en werken daardoor juist integraal en domeinoverstijgend.
-          Toch hebben we gekozen voor een categorisering om de veelzijdigheid
-          van initiatiefkracht beter leesbaar en navigeerbaar te maken. Zo hopen
-          we dat initiatieven, organisaties en bewoners elkaar makkelijker
-          kunnen vinden, versterken en ondersteunen.
+          van Gemeenschap tijdens de Rotterdam Architectuur Maand 2026. Op deze
+          kaart vind je een verzameling van initiatieven in Rotterdam, verdeeld
+          over verschillende categorieën en domein-waarden. De kaart is niet
+          volledig, maar geeft een eerste indruk van de diversiteit aan
+          initiatieven in de stad. Veel initiatieven laten zich niet eenvoudig
+          in één domein plaatsen. Ze ontstaan vaak vanuit een behoefte of
+          urgentie in een wijk of gemeenschap, en werken daardoor juist
+          integraal en domeinoverstijgend. Toch hebben we gekozen voor een
+          categorisering om de veelzijdigheid van initiatiefkracht beter
+          leesbaar en navigeerbaar te maken. Zo hopen we dat initiatieven,
+          organisaties en bewoners elkaar makkelijker kunnen vinden, versterken
+          en ondersteunen.
         </p>
       </div>
     </div>
